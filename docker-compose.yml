@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  dailycomicbot:
+    build: .
+    container_name: dailycomicbot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # Постоянное хранение данных
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Монтирование .env файла для обновлений без пересборки
+      - ./.env:/app/.env:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Nicosia
+    # Ограничения ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Опциональный сервис для мониторинга (можно раскомментировать при необходимости)
+# services:
+#   watchtower:
+#     image: containrrr/watchtower
+#     container_name: watchtower
+#     restart: unless-stopped
+#     volumes:
+#       - /var/run/docker.sock:/var/run/docker.sock
+#     environment:
+#       - WATCHTOWER_CLEANUP=true
+#       - WATCHTOWER_POLL_INTERVAL=3600
+#     command: dailycomicbot
+
+networks:
+  default:
+    name: dailycomicbot_network

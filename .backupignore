@@ -1,0 +1,54 @@
+# Файлы и папки, которые НЕ нужно бекапить
+
+# Логи
+logs/
+*.log
+
+# Временные файлы
+*.tmp
+*.temp
+__pycache__/
+*.pyc
+*.pyo
+
+# Данные (кроме структуры)
+data/evaluations/*.json
+data/evaluations/*.md
+data/history/
+data/images/
+data/jokes/
+data/news/
+
+# Переменные окружения и конфиги с секретами
+.env
+config.py
+
+# Выходные файлы
+output.txt
+*.out
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# IDE файлы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Бинарные файлы
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Большие файлы
+*.zip
+*.tar.gz
+*.rar
+
+# Тестовые файлы
+test_*.py
+*_test.py
+tests/
