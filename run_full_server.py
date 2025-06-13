@@ -129,14 +129,9 @@ class DailyComicBotServer:
                 logger.error("❌ Не удалось создать изображение")
                 return
             
-            # Автоматически одобряем для публикации
-            self.manager.approved_image = {
-                "image_path": image_path,
-                "script": self.manager.winner_script,
-                "average_score": self.manager.winner_score
-            }
-            
-            logger.info("✅ Процесс завершен, изображение готово к автоматической публикации")
+            # НЕ автоматически одобряем - ждем решения пользователя
+            logger.info("✅ Процесс завершен, изображение готово к одобрению пользователя")
+            logger.info("⏳ Ожидается одобрение пользователя через Telegram бот")
             logger.info(f"🏆 Лучший сценарий: {self.manager.winner_script.get('title', 'Без заголовка')}")
             logger.info(f"📊 Оценка: {self.manager.winner_score:.1f}/100")
             
@@ -144,16 +139,27 @@ class DailyComicBotServer:
             logger.error(f"❌ Ошибка в прямом процессе: {str(e)}")
     
     def scheduled_publication(self):
-        """Запланированная публикация."""
+        """Запланированная проверка готовности к публикации (БЕЗ автоматической публикации)."""
         try:
-            logger.info("🕐 Запланированная публикация начата")
-            important_logger.log_scheduled_task_start("publication")
+            logger.info("🕐 Запланированная проверка готовности к публикации")
+            important_logger.log_scheduled_task_start("publication_check")
             
-            # Проверяем, выбрал ли пользователь изображение
+            # Проверяем, выбрал ли пользователь изображение для публикации
             if not hasattr(self.manager, 'approved_image') or not self.manager.approved_image:
-                logger.info("⏳ Пользователь не выбрал изображение для публикации")
-                logger.info("📅 Публикация отложена до выбора пользователя")
+                logger.info("⏳ Пользователь еще не одобрил изображение для публикации")
+                logger.info("📅 Автоматическая публикация НЕ выполняется - ждем одобрения пользователя")
+                
+                # Отправляем напоминание в Telegram бот (если есть готовый контент)
+                if hasattr(self.manager, 'generated_image') and self.manager.generated_image:
+                    self._send_publication_reminder()
+                else:
+                    logger.info("📝 Контент еще не готов для публикации")
+                
+                important_logger.log_scheduled_task_complete("publication_check")
                 return
+            
+            # Если пользователь одобрил - выполняем публикацию
+            logger.info("✅ Пользователь одобрил изображение - выполняем публикацию")
             
             # Получаем данные выбранного изображения
             approved_image = self.manager.approved_image
@@ -184,7 +190,7 @@ class DailyComicBotServer:
                 self.manager.publication_results = publication_result
                 self.manager.save_history()
                 
-                logger.info("✅ Публикация выбранного изображения завершена успешно")
+                logger.info("✅ Публикация одобренного изображения завершена успешно")
                 logger.info(f"📺 Канал: {publication_result.get('channel_id')}")
                 logger.info(f"📝 Пост ID: {publication_result.get('post_message_id')}")
                 logger.info(f"🏆 Опубликован сценарий: {approved_image['script'].get('title', 'Без заголовка')}")
@@ -199,7 +205,7 @@ class DailyComicBotServer:
                 # Очищаем выбор после успешной публикации
                 self.manager.approved_image = None
                 
-                important_logger.log_scheduled_task_complete("publication")
+                important_logger.log_scheduled_task_complete("publication_check")
                 
             else:
                 error_msg = publication_result.get('error', 'Неизвестная ошибка')
@@ -207,8 +213,30 @@ class DailyComicBotServer:
                 important_logger.log_error("scheduled_publication", error_msg)
             
         except Exception as e:
-            logger.error(f"❌ Ошибка в запланированной публикации: {str(e)}")
-            important_logger.log_error("scheduled_publication", str(e))
+            logger.error(f"❌ Ошибка в запланированной проверке публикации: {str(e)}")
+            important_logger.log_error("scheduled_publication_check", str(e))
+    
+    def _send_publication_reminder(self):
+        """Отправка напоминания о необходимости одобрить публикацию."""
+        try:
+            if self.telegram_bot and hasattr(self.telegram_bot, 'send_publication_reminder'):
+                logger.info("📢 Отправка напоминания о публикации в Telegram")
+                # Запускаем в event loop бота
+                if hasattr(self, 'bot_event_loop') and self.bot_event_loop:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.telegram_bot.send_publication_reminder(),
+                        self.bot_event_loop
+                    )
+                    try:
+                        future.result(timeout=5.0)
+                    except asyncio.TimeoutError:
+                        logger.warning("⏰ Таймаут при отправке напоминания")
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка при отправке напоминания: {e}")
+            else:
+                logger.info("📝 Telegram бот недоступен для отправки напоминания")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при отправке напоминания: {str(e)}")
     
     def publish_immediately(self, approved_image):
         """Немедленная публикация выбранного изображения."""
@@ -378,7 +406,7 @@ def main():
     """Основная функция."""
     # Показываем текущее время
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logger.info(f"🕐 Текущее время: {current_time}")
+    logger.info(f"� Текущее время: {current_time}")
     
     # Проверяем обязательные переменные окружения
     required_vars = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ADMIN_CHAT_ID", "OPENAI_API_KEY", "PERPLEXITY_API_KEY"]

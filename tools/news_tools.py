@@ -55,8 +55,19 @@ def read_prompt_from_file():
     Returns:
         tuple: (system_prompt, user_prompt) - системный промпт и пользовательский запрос.
     """
-    default_prompt = "Какая самая важная и обсуждаемая новость сегодня в мире? Дай краткое описание новости, ее источник и почему она важна."
-    default_system_prompt = "Найди и кратко сформулируй главную новость дня на текущую дату. Укажи источник."
+    default_prompt = """Найди самую важную и обсуждаемую новость сегодня в мире.
+
+ОБЯЗАТЕЛЬНО структурируй ответ в следующем формате:
+
+ЗАГОЛОВОК: [Краткий заголовок новости в одну строку]
+
+СОДЕРЖАНИЕ: [Подробное описание новости - что произошло, где, когда, кто участвует, почему это важно. Минимум 3-4 предложения]
+
+ИСТОЧНИК: [Основные источники информации]
+
+ВАЖНОСТЬ: [Почему эта новость важна и актуальна]"""
+    
+    default_system_prompt = "Ты журналист, который находит и структурирует главные новости дня. Всегда используй указанный формат с разделами ЗАГОЛОВОК, СОДЕРЖАНИЕ, ИСТОЧНИК, ВАЖНОСТЬ."
     
     try:
         # Попытка чтения промпта из файла
@@ -204,7 +215,7 @@ def call_perplexity_api_directly() -> Dict[str, Any]:
 
 def extract_title(content: str) -> str:
     """
-    Извлечение заголовка новости из содержимого.
+    Извлечение заголовка новости из структурированного содержимого.
     
     Args:
         content (str): Содержимое новости.
@@ -215,7 +226,7 @@ def extract_title(content: str) -> str:
     if not content:
         return "Новость дня"
     
-    # Поиск заголовка в различных форматах
+    # Поиск заголовка в структурированном формате
     lines = content.split('\n')
     
     for line in lines:
@@ -223,10 +234,19 @@ def extract_title(content: str) -> str:
         if not line:
             continue
             
-        # Если строка начинается с "Заголовок:", "Новость:", "Главная новость:" и т.д.
+        # Ищем строку с "ЗАГОЛОВОК:" (новый формат)
+        if line.upper().startswith('ЗАГОЛОВОК:'):
+            title = line.split(':', 1)[1].strip()
+            if title:
+                # Убираем квадратные скобки если есть
+                title = title.strip('[]')
+                return title
+        
+        # Старые форматы для совместимости
         if any(line.lower().startswith(prefix) for prefix in ['заголовок:', 'новость:', 'главная новость:', 'сегодня:']):
             title = line.split(':', 1)[1].strip()
             if title:
+                title = title.strip('[]')
                 return title
         
         # Если строка в кавычках
@@ -247,3 +267,50 @@ def extract_title(content: str) -> str:
         return title
     
     return "Новость дня"
+
+
+def extract_news_content(content: str) -> str:
+    """
+    Извлечение основного содержания новости из структурированного ответа.
+    
+    Args:
+        content (str): Полное содержимое ответа от Perplexity.
+        
+    Returns:
+        str: Основное содержание новости.
+    """
+    if not content:
+        return content
+    
+    lines = content.split('\n')
+    content_lines = []
+    capturing_content = False
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            if capturing_content:
+                content_lines.append('')
+            continue
+            
+        # Начинаем захват после "СОДЕРЖАНИЕ:"
+        if line.upper().startswith('СОДЕРЖАНИЕ:'):
+            content_text = line.split(':', 1)[1].strip()
+            if content_text:
+                content_lines.append(content_text.strip('[]'))
+            capturing_content = True
+            continue
+        
+        # Останавливаем захват при следующем разделе
+        if capturing_content and any(line.upper().startswith(prefix) for prefix in ['ИСТОЧНИК:', 'ВАЖНОСТЬ:', 'ЗАГОЛОВОК:']):
+            break
+            
+        # Добавляем строки содержания
+        if capturing_content:
+            content_lines.append(line)
+    
+    if content_lines:
+        return '\n'.join(content_lines).strip()
+    
+    # Если структурированного содержания нет, возвращаем весь контент
+    return content
