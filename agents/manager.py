@@ -40,12 +40,13 @@ class ManagerAgent:
         logger.info("Агент-менеджер инициализирован")
     
     @measure_execution_time
-    def collect_news(self, force_new_news=False) -> Dict[str, Any]:
+    def collect_news(self, force_new_news=False, exclude_news=None) -> Dict[str, Any]:
         """
         Сбор главной новости дня.
         
         Args:
             force_new_news (bool): Принудительно получить новую новость, игнорируя существующую.
+            exclude_news (Dict[str, Any], optional): Новость, которую нужно исключить из поиска.
         
         Returns:
             Dict[str, Any]: Информация о главной новости дня.
@@ -57,7 +58,7 @@ class ManagerAgent:
             important_logger.log_perplexity_request()
             
             # Получение главной новости дня
-            self.news = get_top_news(force_new=force_new_news)
+            self.news = get_top_news(force_new=force_new_news, exclude_news=exclude_news)
             
             # Проверка, что новость получена успешно
             if self.news and isinstance(self.news, dict) and 'title' in self.news:

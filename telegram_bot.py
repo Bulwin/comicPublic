@@ -381,8 +381,9 @@ class ComicBotTelegram:
                 await self._send_status_message("🔄 Получаю новую новость...")
         
         try:
-            # Принудительно получаем новую новость
-            news = self.manager.collect_news(force_new_news=True)
+            # Принудительно получаем новую новость, исключая текущую
+            current_news = self.manager.news if hasattr(self.manager, 'news') else None
+            news = self.manager.collect_news(force_new_news=True, exclude_news=current_news)
             if not news:
                 # Если не удалось получить новую новость, предлагаем использовать существующую
                 await self._send_error_message(
@@ -744,6 +745,9 @@ class ComicBotTelegram:
     async def _send_multiple_images_result(self, image_results: List[Dict[str, Any]]):
         """Отправка результатов создания множественных изображений."""
         try:
+            # ИСПРАВЛЕНО: Сохраняем результаты изображений в manager для последующего использования
+            self.manager.image_results = image_results
+            
             # Отправляем сообщение с информацией о процессе
             info_text = f"🖼️ *Создано {len([r for r in image_results if r['success']])} из {len(image_results)} изображений*\n\n"
             info_text += "Выберите лучшее изображение для публикации:"
@@ -838,13 +842,13 @@ class ComicBotTelegram:
             self.manager.winner_script = selected_script_info["script"]
             self.manager.winner_score = selected_script_info["average_score"]
             
-            # Находим путь к изображению
-            image_results = self.manager.create_images_for_top_scripts(top_scripts)
+            # ИСПРАВЛЕНО: Используем уже созданные изображения из manager
             selected_image_path = None
-            for result in image_results:
-                if result["script_info"]["rank"] == rank and result["success"]:
-                    selected_image_path = result["image_path"]
-                    break
+            if hasattr(self.manager, 'image_results') and self.manager.image_results:
+                for result in self.manager.image_results:
+                    if result["script_info"]["rank"] == rank and result["success"]:
+                        selected_image_path = result["image_path"]
+                        break
             
             if not selected_image_path:
                 await self._send_error_message("❌ Не удалось найти изображение для выбранного сценария")
