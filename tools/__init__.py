@@ -7,7 +7,8 @@ from tools.news_tools import get_top_news
 from tools.image_tools import generate_comic_image
 from tools.storage_tools import (
     store_data, load_data, store_daily_data, load_daily_data,
-    list_history_files, save_image, get_image_path, store_news, load_news
+    list_history_files, save_image, get_image_path, store_news, load_news,
+    store_scripts, load_scripts
 )
 from tools.publishing_tools import (
     post_to_telegram, post_to_instagram, publish_to_all_platforms, format_caption

@@ -75,21 +75,11 @@ def call_openai_api(model: str, messages: List[Dict[str, str]], temperature: flo
         modified_messages = messages.copy()
         
         try:
-            # Использование OpenAI API через MCP сервер
-            from utils import use_mcp_tool
-            
-            # Вызов OpenAI API через MCP сервер
-            response = use_mcp_tool(
-                server_name="openai",
-                tool_name="chat",
-                arguments={
-                    "model": model,
-                    "messages": modified_messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "frequency_penalty": frequency_penalty
-                }
-            )
+            # OpenAI API не настроен, используем заглушку
+            logger.warning("OpenAI API не настроен, используется заглушка")
+            response = {
+                "content": "Заглушка: ответ от OpenAI API недоступен"
+            }
             
             # Проверка наличия ответа
             if response and "content" in response:

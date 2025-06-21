@@ -44,23 +44,23 @@ def parse_text_script(text: str) -> Dict[str, Any]:
     info(f"Парсинг текстового формата сценария")
     script = {}
     
-    # Парсинг заголовка
-    title_match = re.search(r'Заголовок:\s*(.*?)(?:\n|$)', text)
+    # Парсинг заголовка (поддержка обоих форматов: "Заголовок:" и "**Заголовок:**")
+    title_match = re.search(r'\*{0,2}Заголовок:\*{0,2}\s*(.*?)(?:\n|$)', text)
     if title_match:
         script['title'] = title_match.group(1).strip()
     else:
         script['title'] = "Без заголовка"
     
-    # Парсинг описания
-    description_match = re.search(r'Общее описание:\s*(.*?)(?=\n\nПанель|\nПанель)', text, re.DOTALL)
+    # Парсинг описания (поддержка обоих форматов: "Общее описание:" и "**Общее описание:**")
+    description_match = re.search(r'\*{0,2}Общее описание:\*{0,2}\s*(.*?)(?=\n\n(?:###\s*)?Панель|\n(?:###\s*)?Панель)', text, re.DOTALL)
     if description_match:
         script['description'] = description_match.group(1).strip()
     else:
         script['description'] = "Без описания"
     
-    # Парсинг панелей
-    panels = []
-    panel_matches = re.finditer(r'Панель (\d+):(.*?)(?=\nПанель \d+:|Подпись под комиксом:|$)', text, re.DOTALL)
+    # Парсинг панелей (поддержка форматов: "Панель 1:", "### Панель 1:")
+    panels = []  # Инициализация списка панелей
+    panel_matches = re.finditer(r'(?:###\s*)?Панель (\d+):(.*?)(?=\n(?:###\s*)?Панель \d+:|\*{0,2}Подпись под комиксом:|$)', text, re.DOTALL)
     
     for match in panel_matches:
         panel_num = int(match.group(1))
@@ -72,13 +72,13 @@ def parse_text_script(text: str) -> Dict[str, Any]:
             'narration': ''
         }
         
-        # Парсинг визуальной сцены (описания панели)
-        scene_match = re.search(r'-\s*Визуальная сцена:\s*["\']?(.*?)["\']?(?=\n|$)', panel_content, re.DOTALL)
+        # Парсинг визуальной сцены (поддержка форматов: "- Визуальная сцена:" и "**Визуальная сцена:**")
+        scene_match = re.search(r'(?:-\s*)?\*{0,2}Визуальная сцена:\*{0,2}\s*["\']?(.*?)["\']?(?=\n|$)', panel_content, re.DOTALL)
         if scene_match:
             panel['description'] = scene_match.group(1).strip()
         
-        # Парсинг текста от автора
-        author_text_match = re.search(r'Текст от автора:\s*(.*?)(?=\n|$)', panel_content, re.DOTALL)
+        # Парсинг текста от автора (поддержка форматов: "Текст от автора:" и "**Текст от автора:**")
+        author_text_match = re.search(r'\*{0,2}Текст от автора:\*{0,2}\s*(.*?)(?=\n|$)', panel_content, re.DOTALL)
         if author_text_match:
             panel['narration'] = author_text_match.group(1).strip()
         
@@ -113,8 +113,8 @@ def parse_text_script(text: str) -> Dict[str, Any]:
     
     script['panels'] = panels
     
-    # Парсинг подписи под комиксом
-    caption_match = re.search(r'Подпись под комиксом:\s*(.*?)(?=\n|$)', text, re.DOTALL)
+    # Парсинг подписи под комиксом (поддержка форматов: "Подпись под комиксом:" и "**Подпись под комиксом:**")
+    caption_match = re.search(r'\*{0,2}Подпись под комиксом:\*{0,2}\s*(.*?)(?=\n|$)', text, re.DOTALL)
     if caption_match:
         script['caption'] = caption_match.group(1).strip()
     else:
@@ -367,7 +367,10 @@ class AssistantsManager:
                 for message in messages.data:
                     if message.role == "assistant":
                         content = message.content[0].text.value if message.content else ""
-                        info(f"Получен ответ от ассистента: {content[:100]}...")
+                        info("=== ПОЛНЫЙ ОТВЕТ ОТ GPT ASSISTANTS API ===")
+                        info(f"Полный ответ от ассистента: {content}")
+                        info(f"Длина ответа: {len(content)} символов")
+                        info("==========================================")
                         return {
                             "role": message.role,
                             "content": content
@@ -399,7 +402,22 @@ class AssistantsManager:
         
         try:
             function_name = tool_call.function.name
+            
+            # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ АРГУМЕНТОВ ФУНКЦИИ
+            info("=== ОТЛАДКА TOOL_CALL ===")
+            info(f"Имя функции: {function_name}")
+            info(f"Сырые аргументы: {tool_call.function.arguments}")
+            info("========================")
+            
             function_args = json.loads(tool_call.function.arguments)
+            
+            # ЛОГИРОВАНИЕ РАСПАРСЕННЫХ АРГУМЕНТОВ
+            info("=== РАСПАРСЕННЫЕ АРГУМЕНТЫ ===")
+            info(f"Аргументы функции: {function_args}")
+            info(f"Ключи в аргументах: {list(function_args.keys())}")
+            for key, value in function_args.items():
+                info(f"  {key}: {type(value)} = {value}")
+            info("=============================")
             
             # Обработка различных инструментов
             if function_name == "get_news_details":
@@ -435,14 +453,25 @@ class AssistantsManager:
         info(f"Получение деталей новости для даты: {date or 'текущая'}")
         
         try:
-            from tools.news_tools import get_top_news
+            from tools.news_tools import get_top_news, extract_title, extract_news_content
             
             # ИСПРАВЛЕНИЕ: Всегда получаем текущую новость дня, игнорируя переданную дату
             # Это гарантирует, что ассистенты получат ту же новость, что и основная система
             news = get_top_news(force_new=False)  # Используем существующую новость
             
             if news:
+                # ИСПРАВЛЕНИЕ: Применяем очистку содержания при каждом обращении
+                # чтобы убрать дублирование заголовка, если оно есть в сохраненной новости
+                raw_content = news.get('content', '')
+                
+                # Если в содержании есть дублирование заголовка, очищаем его
+                if raw_content.startswith('**ЗАГОЛОВОК**') or 'ЗАГОЛОВОК:' in raw_content:
+                    info("Обнаружено дублирование заголовка в содержании, применяем очистку")
+                    cleaned_content = extract_news_content(raw_content)
+                    news['content'] = cleaned_content
+                
                 info(f"Получена главная новость дня: {news.get('title', '')[:100]}...")
+                info(f"Содержание новости: {news.get('content', '')[:100]}...")
                 return news
             else:
                 warning("Не удалось получить новость")
@@ -501,12 +530,20 @@ class AssistantsManager:
         Returns:
             Dict[str, Any]: Результат отправки сценария, включая идентификатор сценария.
         """
+        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ВХОДЯЩИХ ДАННЫХ
+        info("=== ОТЛАДКА SUBMIT_SCRIPT ===")
+        info(f"Тип полученного script: {type(script)}")
+        info(f"Значение script: {script}")
+        info(f"Длина script (если строка): {len(script) if isinstance(script, str) else 'N/A'}")
+        info("=============================")
+        
         # Проверка на None
         if script is None:
-            error("Получен пустой сценарий (None)")
+            info("GPT Assistant вызвал функцию без аргументов (промежуточный шаг)")
+            debug("Это нормальное поведение - Assistant может 'думать' и исправляться")
             return {
                 "success": False,
-                "message": "Получен пустой сценарий"
+                "message": "GPT Assistant вызвал функцию преждевременно (будет повторная попытка)"
             }
         
         try:
@@ -656,13 +693,40 @@ def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-4"
             "type": "function",
             "function": {
                 "name": "submit_script",
-                "description": "Отправка готового сценария",
+                "description": "Отправка готового сценария комикса. ОБЯЗАТЕЛЬНО вызови эту функцию с готовым сценарием в JSON формате.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "script": {
                             "type": "object",
-                            "description": "Сценарий комикса в JSON-формате"
+                            "description": "Готовый сценарий комикса в JSON-формате с полями: title (заголовок), description (описание), panels (массив панелей), caption (подпись)",
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "description": "Заголовок комикса"
+                                },
+                                "description": {
+                                    "type": "string", 
+                                    "description": "Общее описание комикса"
+                                },
+                                "panels": {
+                                    "type": "array",
+                                    "description": "Массив из 4 панелей комикса",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "description": {"type": "string"},
+                                            "dialog": {"type": "array"},
+                                            "narration": {"type": "string"}
+                                        }
+                                    }
+                                },
+                                "caption": {
+                                    "type": "string",
+                                    "description": "Подпись под комиксом"
+                                }
+                            },
+                            "required": ["title", "description", "panels", "caption"]
                         }
                     },
                     "required": ["script"]

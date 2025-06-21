@@ -371,6 +371,125 @@ def truncate_text(text, max_length=100):
 
 
 @handle_exceptions
+def store_script(script: Dict[str, Any], date: Optional[datetime] = None) -> bool:
+    """
+    Сохранение одного сценария в файл.
+    
+    Args:
+        script (Dict[str, Any]): Сценарий для сохранения.
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        bool: True, если сценарий успешно сохранен, иначе False.
+    """
+    try:
+        # Загружаем существующие сценарии
+        existing_scripts = load_scripts(date)
+        
+        # Добавляем новый сценарий
+        existing_scripts.append(script)
+        
+        # Сохраняем обновленный список
+        return store_scripts(existing_scripts, date)
+    
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении сценария: {str(e)}")
+        return False
+
+
+@handle_exceptions
+def store_scripts(scripts: List[Dict[str, Any]], date: Optional[datetime] = None) -> bool:
+    """
+    Сохранение сценариев в файл.
+    
+    Args:
+        scripts (List[Dict[str, Any]]): Список сценариев.
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        bool: True, если сценарии успешно сохранены, иначе False.
+    """
+    try:
+        # Создание директории для сохранения сценариев
+        jokes_dir = Path(DATA_DIR) / "jokes"
+        jokes_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Получение даты
+        if date is None:
+            date = datetime.now()
+        
+        # Формирование имени файла
+        date_str = date.strftime('%Y%m%d')
+        filename = f"jokes_{date_str}.json"
+        
+        # Полный путь к файлу
+        filepath = jokes_dir / filename
+        
+        # Подготовка данных для сохранения
+        data = {
+            "date": date.isoformat(),
+            "scripts": scripts,
+            "total_scripts": len(scripts)
+        }
+        
+        # Сохранение сценариев в файл
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
+        logger.info(f"Сценарии успешно сохранены в файл {filepath}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении сценариев: {str(e)}")
+        return False
+
+
+@handle_exceptions
+def load_scripts(date: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    """
+    Загрузка сценариев из файла.
+    
+    Args:
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        List[Dict[str, Any]]: Список сценариев.
+    """
+    try:
+        # Создание директории для сохранения сценариев
+        jokes_dir = Path(DATA_DIR) / "jokes"
+        jokes_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Получение даты
+        if date is None:
+            date = datetime.now()
+        
+        # Формирование имени файла
+        date_str = date.strftime('%Y%m%d')
+        filename = f"jokes_{date_str}.json"
+        
+        # Полный путь к файлу
+        filepath = jokes_dir / filename
+        
+        # Проверка существования файла
+        if not filepath.exists():
+            logger.warning(f"Файл со сценариями {filepath} не существует")
+            return []
+        
+        # Загрузка сценариев из файла
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        scripts = data.get("scripts", [])
+        logger.info(f"Загружено {len(scripts)} сценариев из файла {filepath}")
+        return scripts
+    
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке сценариев: {str(e)}")
+        return []
+
+
+@handle_exceptions
 def store_all_evaluations(scripts: List[Dict[str, Any]], evaluations: Dict[str, Dict[str, Any]], date: Optional[datetime] = None) -> bool:
     """
     Сохранение всех шуток и их оценок в один файл.

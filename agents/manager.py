@@ -16,7 +16,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils import logger, handle_exceptions, measure_execution_time, important_logger
 from tools import (
     get_top_news, generate_comic_image, store_daily_data, load_daily_data,
-    publish_to_all_platforms, format_caption, store_news
+    publish_to_all_platforms, format_caption, store_news, store_scripts
 )
 import config
 from config import SCRIPTWRITERS, COMIC_PANELS
@@ -150,6 +150,15 @@ class ManagerAgent:
                     logger.error(f"Ошибка при генерации сценария {script_num} для сценариста {writer_type}: {str(e)}")
         
         logger.info(f"Сгенерировано {len(self.scripts)} сценариев")
+        
+        # Сохранение сценариев в файл
+        if self.scripts:
+            try:
+                store_scripts(self.scripts)
+                logger.info("Сценарии успешно сохранены в файл")
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении сценариев: {str(e)}")
+        
         return self.scripts
     
     def invoke_scriptwriter(self, news: Dict[str, Any], writer_type: str) -> Optional[Dict[str, Any]]:
@@ -173,18 +182,17 @@ class ManagerAgent:
                 logger.info(f"Вызов агента-сценариста типа {writer_type} через Assistants API")
                 return assistants_invoke_scriptwriter(news, writer_type)
             
-            # Если Assistants API не используется, используем generate_jokes.py
-            logger.info(f"Вызов агента-сценариста типа {writer_type} через generate_jokes.py")
+            # Если Assistants API не используется, используем прямой вызов сценариста
+            logger.info(f"Вызов агента-сценариста типа {writer_type} через scriptwriter.py")
             
-            # Импортируем функцию main из модуля generate_jokes
-            sys.path.append(str(Path(__file__).resolve().parent.parent))
-            from generate_jokes import main as generate_jokes_main
+            # Импортируем функцию из модуля scriptwriter
+            from agents.scriptwriter import create_script
             
-            # Вызываем функцию generate_jokes_main с указанным типом сценариста
-            script = generate_jokes_main(writer_type=writer_type)
+            # Вызываем функцию create_script с указанным типом сценариста
+            script = create_script(writer_type, news)
             
             if not script:
-                error_msg = f"Не удалось сгенерировать сценарий через generate_jokes.py для сценариста типа {writer_type}"
+                error_msg = f"Не удалось сгенерировать сценарий для сценариста типа {writer_type}"
                 logger.error(error_msg)
                 raise Exception(error_msg)
             

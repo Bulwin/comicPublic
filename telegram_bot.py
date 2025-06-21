@@ -7,13 +7,16 @@ import os
 import sys
 import asyncio
 import logging
-import nest_asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-# Применяем nest_asyncio для решения проблемы с event loop
-nest_asyncio.apply()
+# Применяем nest_asyncio для решения проблемы с event loop (если доступен)
+try:
+    import nest_asyncio
+    nest_asyncio.apply()
+except ImportError:
+    pass  # nest_asyncio не установлен, продолжаем без него
 
 # Telegram Bot API
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -166,20 +169,6 @@ class ComicBotTelegram:
             rank = int(action.split("_")[-1])
             await self._select_image_by_rank(query, rank)
     
-    async def _run_full_process(self):
-        """Запуск полного процесса создания комикса."""
-        try:
-            # Этап 1: Получение новости
-            await self._send_status_message("📰 Получаю новости дня...")
-            news = self.manager.collect_news()
-            
-            if news:
-                await self._send_news_result(news)
-            else:
-                await self._send_error_message("❌ Не удалось получить новости дня")
-                
-        except Exception as e:
-            await self._send_error_message(f"❌ Ошибка при запуске процесса: {str(e)}")
     
     async def _continue_with_scripts(self, query=None):
         """Продолжение с созданием сценариев."""
@@ -278,12 +267,30 @@ class ComicBotTelegram:
     
     async def _send_news_for_approval(self, news: Dict[str, Any]):
         """НОВАЯ ФИЧА: Отправка новости для одобрения перед созданием сценариев."""
-        text = f"📰 *Получена новость:*\n\n"
-        text += f"*{news.get('title', 'Без заголовка')}*\n\n"
+        # Экранируем специальные символы для Markdown
+        def escape_markdown(text):
+            """Экранирование специальных символов для Telegram Markdown."""
+            if not text:
+                return ""
+            # Заменяем проблемные символы
+            text = str(text)
+            # Убираем HTML теги
+            import re
+            text = re.sub(r'<[^>]+>', '', text)
+            # Экранируем специальные символы Markdown
+            special_chars = ['*', '_', '`', '[', ']', '(', ')', '~', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+            for char in special_chars:
+                text = text.replace(char, f'\\{char}')
+            return text
         
-        content = news.get('content', 'Нет содержания')
+        title = escape_markdown(news.get('title', 'Без заголовка'))
+        content = escape_markdown(news.get('content', 'Нет содержания'))
+        
+        text = f"📰 *Получена новость:*\n\n"
+        text += f"*{title}*\n\n"
+        
         if len(content) > 800:
-            text += f"{content[:800]}...\n\n"
+            text += f"{content[:800]}\\.\\.\\.\n\n"
         else:
             text += f"{content}\n\n"
         
@@ -298,7 +305,7 @@ class ComicBotTelegram:
         await self.app.bot.send_message(
             chat_id=self.admin_chat_id,
             text=text,
-            parse_mode='Markdown',
+            parse_mode='MarkdownV2',
             reply_markup=reply_markup
         )
     
@@ -550,7 +557,7 @@ class ComicBotTelegram:
             
             telegram_logger.info(f"📰 Свежая новость получена: {news.get('title', 'Без заголовка')}")
             
-            # НОВАЯ ФИЧА: Показываем новость с возможностью перегенерации
+            # Показываем новость с возможностью перегенерации
             await self._send_news_for_approval(news)
             
         except Exception as e:

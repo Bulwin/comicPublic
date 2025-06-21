@@ -42,7 +42,15 @@ def get_top_news(force_new=False, exclude_news=None) -> Dict[str, Any]:
         
         # Прямой вызов Perplexity API
         logger.info("Получение новой новости через Perplexity API")
-        return call_perplexity_api_directly(exclude_news=exclude_news)
+        news = call_perplexity_api_directly(exclude_news=exclude_news)
+        
+        # Сохраняем полученную новость в файл
+        if news:
+            from tools.storage_tools import store_news
+            store_news(news)
+            logger.info("Новость сохранена в файл")
+        
+        return news
     
     except Exception as e:
         logger.error(f"Ошибка при получении главной новости дня: {str(e)}")
@@ -62,13 +70,9 @@ def read_prompt_from_file():
 
 ЗАГОЛОВОК: [Краткий заголовок новости в одну строку]
 
-СОДЕРЖАНИЕ: [Подробное описание новости - что произошло, где, когда, кто участвует, почему это важно. Минимум 3-4 предложения]
-
-ИСТОЧНИК: [Основные источники информации]
-
-ВАЖНОСТЬ: [Почему эта новость важна и актуальна]"""
+СОДЕРЖАНИЕ: [Подробное описание новости - что произошло, где, когда, кто участвует, почему это важно. Минимум 3-4 предложения]"""
     
-    default_system_prompt = "Ты журналист, который находит и структурирует главные новости дня. Всегда используй указанный формат с разделами ЗАГОЛОВОК, СОДЕРЖАНИЕ, ИСТОЧНИК, ВАЖНОСТЬ."
+    default_system_prompt = "Ты журналист, который находит и структурирует главные новости дня. Всегда используй указанный формат с разделами ЗАГОЛОВОК и СОДЕРЖАНИЕ."
     
     try:
         # Попытка чтения промпта из файла
@@ -202,7 +206,7 @@ def call_perplexity_api_directly(exclude_news=None) -> Dict[str, Any]:
                 result = {
                     "date": datetime.now().isoformat(),
                     "title": extract_title(content),
-                    "content": content,
+                    "content": extract_news_content(content),
                     "source": "Perplexity API",
                     "citations": data.get('citations', [])
                 }
@@ -250,39 +254,52 @@ def extract_title(content: str) -> str:
         line = line.strip()
         if not line:
             continue
-            
+        
+        # Убираем звездочки в начале и конце строки для поиска
+        clean_line = line.strip('*').strip()
+        
         # Ищем строку с "ЗАГОЛОВОК:" (новый формат)
-        if line.upper().startswith('ЗАГОЛОВОК:'):
-            title = line.split(':', 1)[1].strip()
-            if title:
-                # Убираем квадратные скобки если есть
-                title = title.strip('[]')
-                return title
+        if clean_line.upper().startswith('ЗАГОЛОВОК:') or 'ЗАГОЛОВОК:' in clean_line.upper():
+            # Находим позицию двоеточия и берем текст после него
+            if ':' in clean_line:
+                title = clean_line.split(':', 1)[1].strip()
+                if title:
+                    # Убираем квадратные скобки если есть
+                    title = title.strip('[]').strip('*').strip()
+                    logger.info(f"Найден заголовок: '{title}'")
+                    return title
         
         # Старые форматы для совместимости
-        if any(line.lower().startswith(prefix) for prefix in ['заголовок:', 'новость:', 'главная новость:', 'сегодня:']):
-            title = line.split(':', 1)[1].strip()
+        if any(clean_line.lower().startswith(prefix) for prefix in ['заголовок:', 'новость:', 'главная новость:', 'сегодня:']):
+            title = clean_line.split(':', 1)[1].strip()
             if title:
-                title = title.strip('[]')
+                title = title.strip('[]').strip('*').strip()
+                logger.info(f"Найден заголовок (старый формат): '{title}'")
                 return title
         
         # Если строка в кавычках
         if line.startswith('"') and line.endswith('"'):
-            return line[1:-1]
+            title = line[1:-1]
+            logger.info(f"Найден заголовок в кавычках: '{title}'")
+            return title
         
-        # Если строка выделена звездочками
-        if line.startswith('**') and line.endswith('**'):
-            return line[2:-2]
+        # Если строка выделена звездочками и содержит двоеточие
+        if line.startswith('**') and line.endswith('**') and ':' in line:
+            title = line[2:-2]
+            logger.info(f"Найден заголовок в звездочках: '{title}'")
+            return title
     
     # Если ничего не найдено, берем первое предложение
     sentences = content.split('.')
     if sentences and sentences[0].strip():
-        title = sentences[0].strip()
+        title = sentences[0].strip().strip('*').strip()
         # Ограничиваем длину заголовка
         if len(title) > 100:
             title = title[:97] + "..."
+        logger.warning(f"Заголовок не найден, используется первое предложение: '{title}'")
         return title
     
+    logger.warning("Заголовок не найден, используется значение по умолчанию")
     return "Новость дня"
 
 
@@ -309,25 +326,34 @@ def extract_news_content(content: str) -> str:
             if capturing_content:
                 content_lines.append('')
             continue
+        
+        # Убираем звездочки для поиска
+        clean_line = line.strip('*').strip()
             
         # Начинаем захват после "СОДЕРЖАНИЕ:"
-        if line.upper().startswith('СОДЕРЖАНИЕ:'):
-            content_text = line.split(':', 1)[1].strip()
+        if clean_line.upper().startswith('СОДЕРЖАНИЕ:'):
+            content_text = clean_line.split(':', 1)[1].strip()
             if content_text:
-                content_lines.append(content_text.strip('[]'))
+                content_lines.append(content_text.strip('[]').strip('*').strip())
             capturing_content = True
             continue
         
         # Останавливаем захват при следующем разделе
-        if capturing_content and any(line.upper().startswith(prefix) for prefix in ['ИСТОЧНИК:', 'ВАЖНОСТЬ:', 'ЗАГОЛОВОК:']):
+        if capturing_content and any(clean_line.upper().startswith(prefix) for prefix in ['ИСТОЧНИК:', 'ВАЖНОСТЬ:', 'ЗАГОЛОВОК:']):
             break
             
         # Добавляем строки содержания
         if capturing_content:
-            content_lines.append(line)
+            # Убираем звездочки из содержания
+            clean_content_line = line.strip('*').strip()
+            if clean_content_line:
+                content_lines.append(clean_content_line)
     
     if content_lines:
-        return '\n'.join(content_lines).strip()
+        result = '\n'.join(content_lines).strip()
+        logger.info(f"Извлечено содержание: '{result[:100]}...'")
+        return result
     
-    # Если структурированного содержания нет, возвращаем весь контент
+    # Если структурированного содержания нет, возвращаем весь контент без заголовка
+    logger.warning("Структурированное содержание не найдено, возвращаем весь контент")
     return content
