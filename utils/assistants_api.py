@@ -652,7 +652,7 @@ def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-4"
     Создание ассистента-сценариста.
     
     Args:
-        instructions: Инструкции для ассистента. Если не указаны, используются стандартные инструкции.
+        instructions: Инструкции для ассистента. НЕ ИСПОЛЬЗУЕТСЯ - промпты хранятся в UI OpenAI.
         model: Модель для ассистента.
         
     Returns:
@@ -660,15 +660,9 @@ def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-4"
     """
     info("Создание ассистента-сценариста")
     
-    # Если инструкции не указаны, загружаем их из файла
-    if not instructions:
-        instructions_path = Path(__file__).resolve().parent.parent / "instructions" / "scriptwriter_instructions.md"
-        try:
-            with open(instructions_path, "r", encoding="utf-8") as f:
-                instructions = f.read()
-        except Exception as e:
-            error(f"Ошибка при загрузке инструкций для сценариста: {str(e)}")
-            instructions = "Ты - агент-сценарист в системе DailyComicBot, отвечающий за создание сценариев комиксов на основе главной новости дня."
+    # ВАЖНО: Промпты хранятся в UI OpenAI у каждого ассистента индивидуально
+    # Инструкции НЕ отправляются из кода клиента
+    instructions = "Базовые инструкции (реальные промпты в UI OpenAI)"
     
     # Создание инструментов
     tools = [
@@ -754,7 +748,7 @@ def create_jury_assistant(instructions: str = None, model: str = "gpt-4") -> str
     Создание ассистента-жюри.
     
     Args:
-        instructions: Инструкции для ассистента. Если не указаны, используются стандартные инструкции.
+        instructions: Инструкции для ассистента. НЕ ИСПОЛЬЗУЕТСЯ - промпты хранятся в UI OpenAI.
         model: Модель для ассистента.
         
     Returns:
@@ -762,15 +756,9 @@ def create_jury_assistant(instructions: str = None, model: str = "gpt-4") -> str
     """
     info("Создание ассистента-жюри")
     
-    # Если инструкции не указаны, загружаем их из файла
-    if not instructions:
-        instructions_path = Path(__file__).resolve().parent.parent / "instructions" / "jury_instructions.md"
-        try:
-            with open(instructions_path, "r", encoding="utf-8") as f:
-                instructions = f.read()
-        except Exception as e:
-            error(f"Ошибка при загрузке инструкций для жюри: {str(e)}")
-            instructions = "Ты - агент-жюри в системе DailyComicBot, отвечающий за оценку сценариев комиксов, созданных на основе главной новости дня."
+    # ВАЖНО: Промпты хранятся в UI OpenAI у каждого ассистента индивидуально
+    # Инструкции НЕ отправляются из кода клиента
+    instructions = "Базовые инструкции (реальные промпты в UI OpenAI)"
     
     # Создание инструментов
     tools = [
