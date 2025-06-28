@@ -31,6 +31,72 @@ except ImportError:
     error("Не удалось импортировать модуль OpenAI. Установите его с помощью команды: pip install openai")
 
 
+def parse_text_evaluation(text: str) -> Dict[str, Any]:
+    """
+    Парсинг текстового формата оценки жюри.
+    
+    Args:
+        text: Текстовая оценка жюри.
+        
+    Returns:
+        Dict[str, Any]: Оценка в формате JSON.
+    """
+    info(f"Парсинг текстового формата оценки жюри")
+    evaluation = {
+        "scores": {},
+        "comments": {},
+        "total_score": 0,
+        "overall_comment": ""
+    }
+    
+    # Парсинг релевантности
+    relevance_match = re.search(r'Релевантность:\s*(\d+)/20\s*(?:\n-\s*(.*?)(?=\n\w+:|$))?', text, re.DOTALL)
+    if relevance_match:
+        evaluation["scores"]["relevance"] = int(relevance_match.group(1))
+        evaluation["comments"]["relevance"] = relevance_match.group(2).strip() if relevance_match.group(2) else ""
+    
+    # Парсинг оригинальности
+    originality_match = re.search(r'Оригинальность:\s*(\d+)/20\s*(?:\n-\s*(.*?)(?=\n\w+:|$))?', text, re.DOTALL)
+    if originality_match:
+        evaluation["scores"]["originality"] = int(originality_match.group(1))
+        evaluation["comments"]["originality"] = originality_match.group(2).strip() if originality_match.group(2) else ""
+    
+    # Парсинг юмористического потенциала
+    humor_match = re.search(r'Юмористический потенциал:\s*(\d+)/30\s*(?:\n-\s*(.*?)(?=\n\w+:|$))?', text, re.DOTALL)
+    if humor_match:
+        evaluation["scores"]["humor"] = int(humor_match.group(1))
+        evaluation["comments"]["humor"] = humor_match.group(2).strip() if humor_match.group(2) else ""
+    
+    # Парсинг структуры и логики
+    structure_match = re.search(r'Структура и логика:\s*(\d+)/15\s*(?:\n-\s*(.*?)(?=\n\w+:|$))?', text, re.DOTALL)
+    if structure_match:
+        evaluation["scores"]["structure"] = int(structure_match.group(1))
+        evaluation["comments"]["structure"] = structure_match.group(2).strip() if structure_match.group(2) else ""
+    
+    # Парсинг визуального потенциала
+    visual_match = re.search(r'Визуальный потенциал:\s*(\d+)/15\s*(?:\n-\s*(.*?)(?=\n\w+:|$))?', text, re.DOTALL)
+    if visual_match:
+        evaluation["scores"]["visual"] = int(visual_match.group(1))
+        evaluation["comments"]["visual"] = visual_match.group(2).strip() if visual_match.group(2) else ""
+    
+    # Парсинг итоговой оценки
+    total_match = re.search(r'Итоговая оценка:\s*(\d+)/100', text)
+    if total_match:
+        evaluation["total_score"] = int(total_match.group(1))
+    else:
+        # Если итоговая оценка не найдена, вычисляем сумму
+        total = sum(evaluation["scores"].values())
+        evaluation["total_score"] = total
+    
+    # Парсинг общего комментария
+    comment_match = re.search(r'Общий комментарий:\s*(.*?)(?=\n\n|$)', text, re.DOTALL)
+    if comment_match:
+        evaluation["overall_comment"] = comment_match.group(1).strip()
+    
+    debug(f"Результат парсинга оценки: {json.dumps(evaluation, ensure_ascii=False)[:200]}...")
+    return evaluation
+
+
 def parse_text_script(text: str) -> Dict[str, Any]:
     """
     Парсинг текстового формата сценария комикса.
@@ -1016,9 +1082,15 @@ def invoke_jury(script: Dict[str, Any], jury_type: str, news: Dict[str, Any]) ->
                 # Сначала пробуем распарсить как JSON
                 evaluation = json.loads(response["content"])
             except json.JSONDecodeError:
-                # Если не удалось, выводим ошибку - для жюри не реализован парсинг текстового формата
-                error(f"Не удалось распарсить ответ от ассистента-жюри: {response['content']}")
-                return None
+                # Если не удалось, пробуем распарсить как текстовый формат
+                info(f"Ответ не в формате JSON, пробуем парсить как текстовую оценку")
+                evaluation = parse_text_evaluation(response["content"])
+                
+                if not evaluation or not evaluation.get("scores"):
+                    error(f"Не удалось распарсить ответ от ассистента-жюри: {response['content'][:500]}...")
+                    return None
+                
+                info(f"Успешно распарсена текстовая оценка с итоговым баллом: {evaluation.get('total_score', 0)}")
             
             # Проверка наличия всех необходимых полей
             required_fields = ["scores", "comments", "total_score", "overall_comment"]
