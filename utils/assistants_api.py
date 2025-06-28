@@ -13,6 +13,7 @@ import logging
 from datetime import datetime
 
 # Импорт модулей проекта
+from tools.storage_tools import store_script
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils.logger import info, error, warning, debug
 from utils.error_handler import handle_exceptions
