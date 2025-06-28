@@ -614,8 +614,6 @@ class AssistantsManager:
             }
         
         try:
-            from tools.storage_tools import store_script
-            
             # Если получена строка, пытаемся распарсить как JSON
             if isinstance(script, str):
                 info("Получена строка, пытаемся распарсить как JSON")
