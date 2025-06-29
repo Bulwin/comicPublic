@@ -620,3 +620,211 @@ def store_all_evaluations(scripts: List[Dict[str, Any]], evaluations: Dict[str, 
     except Exception as e:
         logger.error(f"Ошибка при сохранении всех оценок: {str(e)}")
         return False
+
+
+# ===== НОВЫЕ ФУНКЦИИ ДЛЯ АНЕКДОТОВ (НЕ ИЗМЕНЯЮТ СУЩЕСТВУЮЩИЙ ФУНКЦИОНАЛ) =====
+
+@handle_exceptions
+def store_joke(joke: Dict[str, Any], date: Optional[datetime] = None) -> bool:
+    """
+    Сохранение одного анекдота в файл.
+    
+    Args:
+        joke (Dict[str, Any]): Анекдот для сохранения.
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        bool: True, если анекдот успешно сохранен, иначе False.
+    """
+    try:
+        # Загружаем существующие анекдоты
+        existing_jokes = load_jokes(date)
+        
+        # Добавляем новый анекдот
+        existing_jokes.append(joke)
+        
+        # Сохраняем обновленный список
+        return store_jokes(existing_jokes, date)
+    
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении анекдота: {str(e)}")
+        return False
+
+
+@handle_exceptions
+def store_jokes(jokes: List[Dict[str, Any]], date: Optional[datetime] = None) -> bool:
+    """
+    Сохранение анекдотов в файл.
+    
+    Args:
+        jokes (List[Dict[str, Any]]): Список анекдотов.
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        bool: True, если анекдоты успешно сохранены, иначе False.
+    """
+    try:
+        # Создание директории для сохранения анекдотов
+        jokes_dir = Path(DATA_DIR) / "jokes"
+        jokes_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Получение даты
+        if date is None:
+            date = datetime.now()
+        
+        # Формирование имени файла
+        date_str = date.strftime('%Y%m%d')
+        filename = f"jokes_{date_str}.json"
+        
+        # Полный путь к файлу
+        filepath = jokes_dir / filename
+        
+        # Подготовка данных для сохранения
+        data = {
+            "date": date.isoformat(),
+            "jokes": jokes,
+            "total_jokes": len(jokes)
+        }
+        
+        # Сохранение анекдотов в файл
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
+        logger.info(f"Анекдоты успешно сохранены в файл {filepath}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении анекдотов: {str(e)}")
+        return False
+
+
+@handle_exceptions
+def load_jokes(date: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    """
+    Загрузка анекдотов из файла.
+    
+    Args:
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        List[Dict[str, Any]]: Список анекдотов.
+    """
+    try:
+        # Создание директории для сохранения анекдотов
+        jokes_dir = Path(DATA_DIR) / "jokes"
+        jokes_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Получение даты
+        if date is None:
+            date = datetime.now()
+        
+        # Формирование имени файла
+        date_str = date.strftime('%Y%m%d')
+        filename = f"jokes_{date_str}.json"
+        
+        # Полный путь к файлу
+        filepath = jokes_dir / filename
+        
+        # Проверка существования файла
+        if not filepath.exists():
+            logger.warning(f"Файл с анекдотами {filepath} не существует")
+            return []
+        
+        # Загрузка анекдотов из файла
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        jokes = data.get("jokes", [])
+        logger.info(f"Загружено {len(jokes)} анекдотов из файла {filepath}")
+        return jokes
+    
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке анекдотов: {str(e)}")
+        return []
+
+
+@handle_exceptions
+def store_joke_publication(publication_data: Dict[str, Any], date: Optional[datetime] = None) -> bool:
+    """
+    Сохранение данных о публикации анекдота.
+    
+    Args:
+        publication_data (Dict[str, Any]): Данные о публикации анекдота.
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        bool: True, если данные успешно сохранены, иначе False.
+    """
+    try:
+        # Создание директории для сохранения публикаций
+        publications_dir = Path(DATA_DIR) / "joke_publications"
+        publications_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Получение даты
+        if date is None:
+            date = datetime.now()
+        
+        # Формирование имени файла
+        date_str = date.strftime('%Y%m%d')
+        filename = f"joke_publication_{date_str}.json"
+        
+        # Полный путь к файлу
+        filepath = publications_dir / filename
+        
+        # Добавление временной метки
+        publication_data["saved_at"] = datetime.now().isoformat()
+        
+        # Сохранение данных о публикации в файл
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(publication_data, f, ensure_ascii=False, indent=4)
+        
+        logger.info(f"Данные о публикации анекдота успешно сохранены в файл {filepath}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении данных о публикации анекдота: {str(e)}")
+        return False
+
+
+@handle_exceptions
+def load_joke_publication(date: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+    """
+    Загрузка данных о публикации анекдота.
+    
+    Args:
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        Optional[Dict[str, Any]]: Данные о публикации или None, если файл не найден.
+    """
+    try:
+        # Создание директории для сохранения публикаций
+        publications_dir = Path(DATA_DIR) / "joke_publications"
+        publications_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Получение даты
+        if date is None:
+            date = datetime.now()
+        
+        # Формирование имени файла
+        date_str = date.strftime('%Y%m%d')
+        filename = f"joke_publication_{date_str}.json"
+        
+        # Полный путь к файлу
+        filepath = publications_dir / filename
+        
+        # Проверка существования файла
+        if not filepath.exists():
+            logger.warning(f"Файл с данными о публикации анекдота {filepath} не существует")
+            return None
+        
+        # Загрузка данных из файла
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        logger.info(f"Данные о публикации анекдота загружены из файла {filepath}")
+        return data
+    
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке данных о публикации анекдота: {str(e)}")
+        return None

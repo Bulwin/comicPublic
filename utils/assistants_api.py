@@ -499,6 +499,9 @@ class AssistantsManager:
             elif function_name == "submit_evaluation":
                 return self._submit_evaluation(function_args.get("evaluation"))
             
+            elif function_name == "submit_joke":
+                return self._submit_joke(function_args.get("joke"))
+            
             else:
                 warning(f"Неизвестный инструмент: {function_name}")
                 return {"error": f"Неизвестный инструмент: {function_name}"}
@@ -707,6 +710,97 @@ class AssistantsManager:
                 "success": False,
                 "message": f"Ошибка при отправке оценки: {str(e)}"
             }
+    
+    def _submit_joke(self, joke: Any) -> Dict[str, Any]:
+        """
+        Отправка готового анекдота.
+        
+        Args:
+            joke: Анекдот в JSON-формате или строке.
+            
+        Returns:
+            Dict[str, Any]: Результат отправки анекдота, включая идентификатор анекдота.
+        """
+        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ВХОДЯЩИХ ДАННЫХ
+        info("=== ОТЛАДКА SUBMIT_JOKE ===")
+        info(f"Тип полученного joke: {type(joke)}")
+        info(f"Значение joke: {joke}")
+        info(f"Длина joke (если строка): {len(joke) if isinstance(joke, str) else 'N/A'}")
+        info("===========================")
+        
+        # Проверка на None
+        if joke is None:
+            info("GPT Assistant вызвал функцию без аргументов (промежуточный шаг)")
+            debug("Это нормальное поведение - Assistant может 'думать' и исправляться")
+            return {
+                "success": False,
+                "message": "GPT Assistant вызвал функцию преждевременно (будет повторная попытка)"
+            }
+        
+        try:
+            # Если получена строка, пытаемся распарсить как JSON
+            if isinstance(joke, str):
+                info("Получена строка, пытаемся распарсить как JSON")
+                try:
+                    joke = json.loads(joke)
+                except json.JSONDecodeError:
+                    # Если не JSON, создаем структуру анекдота из текста
+                    info("Не JSON, создаем структуру анекдота из текста")
+                    joke = {
+                        "title": "Анекдот",
+                        "content": joke
+                    }
+            
+            # Проверка базовой структуры анекдота
+            if not isinstance(joke, dict):
+                error(f"Анекдот должен быть словарем, получен: {type(joke)}")
+                return {
+                    "success": False,
+                    "message": f"Неверный формат анекдота: {type(joke)}"
+                }
+            
+            # Проверка обязательных полей
+            if "title" not in joke:
+                joke["title"] = "Анекдот"
+            if "content" not in joke:
+                error("В анекдоте отсутствует поле 'content'")
+                return {
+                    "success": False,
+                    "message": "В анекдоте отсутствует содержание"
+                }
+            
+            info(f"Отправка анекдота: {joke.get('title', 'Без заголовка')}")
+            
+            # Генерация идентификатора анекдота, если его нет
+            if "joke_id" not in joke:
+                writer_type = joke.get("writer_type", "unknown")
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                joke["joke_id"] = f"{writer_type}_{timestamp}"
+            
+            # Сохранение анекдота
+            from tools.storage_tools import store_joke
+            success = store_joke(joke)
+            
+            if success:
+                info(f"Анекдот успешно сохранен с ID: {joke['joke_id']}")
+                return {
+                    "success": True,
+                    "joke_id": joke["joke_id"],
+                    "message": "Анекдот успешно сохранен"
+                }
+            else:
+                warning(f"Не удалось сохранить анекдот")
+                return {
+                    "success": False,
+                    "message": "Не удалось сохранить анекдот"
+                }
+        
+        except Exception as e:
+            error(f"Ошибка при отправке анекдота: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Ошибка при отправке анекдота: {str(e)}"
+            }
 
 
 # Функции для работы с ассистентами
@@ -789,6 +883,34 @@ def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-4"
                         }
                     },
                     "required": ["script"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "submit_joke",
+                "description": "Отправка готового анекдота. ОБЯЗАТЕЛЬНО вызови эту функцию с готовым анекдотом в JSON формате.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "joke": {
+                            "type": "object",
+                            "description": "Готовый анекдот в JSON-формате с полями: title (заголовок), content (содержание анекдота)",
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "description": "Заголовок анекдота"
+                                },
+                                "content": {
+                                    "type": "string", 
+                                    "description": "Полный текст анекдота с пуантом"
+                                }
+                            },
+                            "required": ["title", "content"]
+                        }
+                    },
+                    "required": ["joke"]
                 }
             }
         }
@@ -1130,4 +1252,101 @@ def invoke_jury(script: Dict[str, Any], jury_type: str, news: Dict[str, Any]) ->
     
     except Exception as e:
         error(f"Ошибка при вызове агента-жюри {jury_type}: {str(e)}")
+        return None
+
+
+# ===== НОВЫЕ ФУНКЦИИ ДЛЯ АНЕКДОТОВ (НЕ ИЗМЕНЯЮТ СУЩЕСТВУЮЩИЙ ФУНКЦИОНАЛ) =====
+
+@handle_exceptions
+def invoke_joke_writer(news: Dict[str, Any], writer_type: str) -> Optional[Dict[str, Any]]:
+    """
+    Вызов агента-автора для создания анекдота.
+    
+    Args:
+        news: Информация о новости дня.
+        writer_type: Тип автора (A, B, C, D, E).
+        
+    Returns:
+        Optional[Dict[str, Any]]: Сгенерированный анекдот или None в случае ошибки.
+    """
+    info(f"Вызов агента-автора анекдотов типа {writer_type}")
+    
+    try:
+        # Инициализация менеджера ассистентов
+        assistants_manager = AssistantsManager()
+        
+        # Создание потока для автора анекдотов
+        thread_name = f"joke_writer_{writer_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        assistants_manager.create_thread(thread_name)
+        
+        # Формирование запроса - отправляем текст новости с указанием, что нужен анекдот
+        news_text = f"Создай анекдот на основе этой новости:\n\nЗаголовок: {news.get('title', '')}\n\nСодержание: {news.get('content', '')}"
+        
+        # Добавление сообщения в поток
+        assistants_manager.add_message(
+            thread_name=thread_name,
+            content=news_text
+        )
+        
+        # Определение имени ассистента (используем тех же ассистентов, что и для комиксов)
+        assistant_name = f"scriptwriter_{writer_type}"
+        instructions = None
+        
+        # Проверка наличия специфичного ассистента для данного типа
+        if assistant_name not in assistants_manager.assistants:
+            # Если специфичного ассистента нет, используем любого доступного
+            if assistants_manager.scriptwriter_assistants:
+                # Берем первого доступного ассистента-сценариста
+                assistant_type, assistant_id = assistants_manager.scriptwriter_assistants[0]
+                assistant_name = f"scriptwriter_{assistant_type}"
+                info(f"Используем ассистента типа {assistant_type} вместо {writer_type} для анекдота")
+            else:
+                error(f"Не найдено ни одного ассистента для создания анекдотов")
+                return None
+            
+            # Добавляем инструкции для переключения на нужный тип и создание анекдота
+            instructions = f"Ты - автор анекдотов типа {writer_type}. Создай короткий смешной анекдот (1-3 абзаца) на основе предоставленной новости. Используй свой уникальный стиль юмора. КРИТИЧЕСКИ ВАЖНО: Анекдот должен быть написан ТОЛЬКО на русском языке! Используй функцию submit_joke для отправки готового анекдота."
+        else:
+            # Если ассистент найден, добавляем инструкции для создания анекдота
+            instructions = f"Создай короткий смешной анекдот (1-3 абзаца) на основе предоставленной новости. Используй свой уникальный стиль юмора. КРИТИЧЕСКИ ВАЖНО: Анекдот должен быть написан ТОЛЬКО на русском языке! Используй функцию submit_joke для отправки готового анекдота."
+        
+        # Запуск ассистента
+        response = assistants_manager.run_assistant(
+            thread_name=thread_name,
+            assistant_name=assistant_name,
+            instructions=instructions
+        )
+        
+        # Парсинг ответа
+        if response and "content" in response:
+            try:
+                # Сначала пробуем распарсить как JSON
+                joke = json.loads(response["content"])
+            except json.JSONDecodeError:
+                # Если не удалось, создаем структуру анекдота из текста
+                info(f"Ответ не в формате JSON, создаем анекдот из текста")
+                joke = {
+                    "title": f"Анекдот от {writer_type}",
+                    "content": response["content"]
+                }
+            
+            # Проверка обязательных полей
+            if "title" not in joke:
+                joke["title"] = f"Анекдот от {writer_type}"
+            if "content" not in joke:
+                error(f"В анекдоте отсутствует содержание")
+                return None
+            
+            # Добавление метаданных
+            joke["writer_type"] = writer_type
+            from config import SCRIPTWRITERS
+            joke["writer_name"] = SCRIPTWRITERS[writer_type]["name"]
+            
+            return joke
+        
+        warning(f"Не удалось получить ответ от ассистента")
+        return None
+    
+    except Exception as e:
+        error(f"Ошибка при вызове агента-автора анекдотов {writer_type}: {str(e)}")
         return None

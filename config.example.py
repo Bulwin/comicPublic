@@ -89,6 +89,10 @@ COMIC_PANELS = 4  # Количество панелей в комиксе
 HISTORY_FILE_FORMAT = "%Y-%m-%d.json"  # Формат имени файла истории (по дате)
 
 # Настройки Assistants API
-USE_ASSISTANTS_API = True  # Использовать ли Assistants API вместо прямых вызовов OpenAI API
+USE_ASSISTANTS_API = os.getenv("USE_ASSISTANTS_API", "True").lower() == "true"  # Использовать ли Assistants API вместо прямых вызовов OpenAI API
 ASSISTANTS_API_TIMEOUT = 60  # Таймаут для запросов к Assistants API в секундах
 ASSISTANTS_API_MAX_RETRIES = 3  # Максимальное количество попыток запроса к Assistants API
+
+# Настройки времени для анекдотов
+JOKE_PUBLICATION_HOUR = int(os.getenv("JOKE_PUBLICATION_HOUR", "14"))
+JOKE_PUBLICATION_MINUTE = int(os.getenv("JOKE_PUBLICATION_MINUTE", "0"))

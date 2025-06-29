@@ -37,6 +37,11 @@ class ManagerAgent:
         self.image_path = None
         self.publication_results = None
         
+        # Новые атрибуты для анекдотов (НЕ ИЗМЕНЯЮТ существующий функционал)
+        self.jokes = []
+        self.selected_joke = None
+        self.joke_publication_results = None
+        
         logger.info("Агент-менеджер инициализирован")
     
     @measure_execution_time
@@ -1141,6 +1146,247 @@ class ManagerAgent:
             logger.info("Полный процесс успешно завершен")
         else:
             logger.error("Полный процесс завершен с ошибками")
+        
+        return results
+
+
+    # ===== НОВЫЕ МЕТОДЫ ДЛЯ АНЕКДОТОВ (НЕ ИЗМЕНЯЮТ СУЩЕСТВУЮЩИЙ ФУНКЦИОНАЛ) =====
+    
+    @measure_execution_time
+    def generate_jokes(self, news: Dict[str, Any] = None, force_new_news: bool = False) -> List[Dict[str, Any]]:
+        """
+        Генерация анекдотов на основе новости дня.
+        
+        Args:
+            news (Dict[str, Any], optional): Новость для анекдотов. Если None, используется self.news или получается автоматически.
+            force_new_news (bool): Принудительно получить новую новость.
+        
+        Returns:
+            List[Dict[str, Any]]: Список сгенерированных анекдотов.
+        """
+        logger.info("Начало генерации анекдотов через manager")
+        
+        # Определяем новость для анекдотов
+        target_news = news
+        if target_news is None:
+            # Используем новость из текущего состояния manager
+            if self.news:
+                target_news = self.news
+                logger.info("Используется новость из текущего состояния manager")
+            else:
+                # Получаем новость автоматически
+                logger.info("Получаем новость автоматически для анекдотов")
+                target_news = self.collect_news(force_new_news=force_new_news)
+                if not target_news:
+                    logger.error("Не удалось получить новость для анекдотов")
+                    return []
+        
+        try:
+            # Используем агент для анекдотов
+            from agents.joke_writer import get_joke_writer
+            joke_writer = get_joke_writer()
+            
+            # Генерируем анекдоты
+            jokes = joke_writer.generate_jokes(target_news)
+            
+            # Сохраняем анекдоты в состоянии manager
+            self.jokes = jokes
+            
+            logger.info(f"Сгенерировано {len(jokes)} анекдотов через manager")
+            return jokes
+        
+        except Exception as e:
+            logger.error(f"Ошибка при генерации анекдотов через manager: {str(e)}")
+            return []
+    
+    def select_best_joke(self, jokes: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """
+        Выбор лучшего анекдота.
+        
+        Args:
+            jokes (List[Dict[str, Any]], optional): Список анекдотов. Если None, используется self.jokes.
+        
+        Returns:
+            Optional[Dict[str, Any]]: Лучший анекдот или None.
+        """
+        target_jokes = jokes if jokes is not None else self.jokes
+        
+        if not target_jokes:
+            logger.warning("Нет анекдотов для выбора")
+            return None
+        
+        try:
+            from agents.joke_writer import get_joke_writer
+            joke_writer = get_joke_writer()
+            
+            # Выбираем лучший анекдот
+            best_joke = joke_writer.select_best_joke(target_jokes)
+            
+            # Сохраняем выбранный анекдот
+            self.selected_joke = best_joke
+            
+            if best_joke:
+                logger.info(f"Выбран лучший анекдот: {best_joke.get('title', 'Без заголовка')} от {best_joke.get('writer_name', 'Неизвестен')}")
+            
+            return best_joke
+        
+        except Exception as e:
+            logger.error(f"Ошибка при выборе лучшего анекдота: {str(e)}")
+            return None
+    
+    def get_joke_by_author(self, author_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Получение анекдота конкретного автора.
+        
+        Args:
+            author_type (str): Тип автора (A, B, C, D, E).
+        
+        Returns:
+            Optional[Dict[str, Any]]: Анекдот автора или None.
+        """
+        if not self.jokes:
+            logger.warning("Нет анекдотов для поиска по автору")
+            return None
+        
+        try:
+            from agents.joke_writer import get_joke_writer
+            joke_writer = get_joke_writer()
+            
+            # Устанавливаем анекдоты в агент
+            joke_writer.jokes = self.jokes
+            
+            # Получаем анекдот по автору
+            joke = joke_writer.get_joke_by_author(author_type)
+            
+            return joke
+        
+        except Exception as e:
+            logger.error(f"Ошибка при получении анекдота автора {author_type}: {str(e)}")
+            return None
+    
+    @measure_execution_time
+    def publish_joke(self, joke: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+        """
+        Публикация анекдота в канал.
+        
+        Args:
+            joke (Dict[str, Any], optional): Анекдот для публикации. Если None, используется self.selected_joke.
+        
+        Returns:
+            Optional[Dict[str, Any]]: Результаты публикации или None в случае ошибки.
+        """
+        logger.info("Начало публикации анекдота через manager")
+        
+        target_joke = joke if joke is not None else self.selected_joke
+        
+        if not target_joke:
+            logger.error("Нет анекдота для публикации")
+            return None
+        
+        if not self.news:
+            logger.error("Нет новости для публикации анекдота")
+            return None
+        
+        try:
+            # Импортируем функцию публикации анекдотов
+            from tools.publishing_tools import publish_joke_to_all_platforms
+            
+            # Публикуем анекдот
+            publication_result = publish_joke_to_all_platforms(
+                joke=target_joke,
+                news_title=self.news.get("title", "")
+            )
+            
+            # Сохраняем результаты публикации
+            self.joke_publication_results = publication_result
+            
+            if publication_result.get("success"):
+                logger.info(f"Анекдот '{target_joke.get('title')}' успешно опубликован")
+            else:
+                logger.warning(f"Публикация анекдота завершилась с ошибками: {publication_result}")
+            
+            return publication_result
+        
+        except Exception as e:
+            logger.error(f"Ошибка при публикации анекдота: {str(e)}")
+            return None
+    
+    @measure_execution_time
+    def run_joke_process(self, force_new_news: bool = False, news: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Запуск полного процесса создания анекдотов.
+        
+        Args:
+            force_new_news (bool): Принудительно получить новую новость.
+            news (Dict[str, Any], optional): Конкретная новость для анекдотов.
+        
+        Returns:
+            Dict[str, Any]: Результаты выполнения процесса.
+        """
+        logger.info("Запуск полного процесса создания анекдотов через manager")
+        
+        results = {
+            "success": False,
+            "steps": {}
+        }
+        
+        # Шаг 1: Получение/использование новости
+        try:
+            if news:
+                # Используем переданную новость
+                self.news = news
+                results["steps"]["get_news"] = {"success": True, "data": news, "source": "provided"}
+            elif self.news and not force_new_news:
+                # Используем существующую новость
+                results["steps"]["get_news"] = {"success": True, "data": self.news, "source": "existing"}
+            else:
+                # Получаем новую новость
+                news_result = self.collect_news(force_new_news=force_new_news)
+                results["steps"]["get_news"] = {"success": bool(news_result), "data": news_result, "source": "new"}
+                
+                if not news_result:
+                    logger.error("Процесс остановлен: не удалось получить новость")
+                    return results
+        except Exception as e:
+            logger.error(f"Ошибка при получении новости: {str(e)}")
+            results["steps"]["get_news"] = {"success": False, "error": str(e)}
+            return results
+        
+        # Шаг 2: Генерация анекдотов
+        try:
+            jokes = self.generate_jokes(self.news)
+            results["steps"]["generate_jokes"] = {"success": bool(jokes), "count": len(jokes)}
+            
+            if not jokes:
+                logger.error("Процесс остановлен: не удалось сгенерировать анекдоты")
+                return results
+        except Exception as e:
+            logger.error(f"Ошибка при генерации анекдотов: {str(e)}")
+            results["steps"]["generate_jokes"] = {"success": False, "error": str(e)}
+            return results
+        
+        # Шаг 3: Выбор лучшего анекдота
+        try:
+            best_joke = self.select_best_joke(jokes)
+            results["steps"]["select_best"] = {"success": bool(best_joke), "data": best_joke}
+            
+            if not best_joke:
+                logger.warning("Не удалось выбрать лучший анекдот")
+        except Exception as e:
+            logger.error(f"Ошибка при выборе лучшего анекдота: {str(e)}")
+            results["steps"]["select_best"] = {"success": False, "error": str(e)}
+        
+        # Определение общего результата
+        results["success"] = all(
+            step.get("success", False) 
+            for step_name, step in results["steps"].items()
+            if step_name != "select_best"  # Выбор лучшего не критичен
+        )
+        
+        if results["success"]:
+            logger.info("Процесс создания анекдотов успешно завершен")
+        else:
+            logger.error("Процесс создания анекдотов завершен с ошибками")
         
         return results
 
