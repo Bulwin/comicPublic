@@ -64,18 +64,10 @@ def read_prompt_from_file():
     Returns:
         tuple: (system_prompt, user_prompt) - системный промпт и пользовательский запрос.
     """
-    default_prompt = """Найди самую важную и обсуждаемую новость сегодня в мире.
-
-ОБЯЗАТЕЛЬНО структурируй ответ в следующем формате:
-
-ЗАГОЛОВОК: [Краткий заголовок новости в одну строку]
-
-СОДЕРЖАНИЕ: [Подробное описание новости - что произошло, где, когда, кто участвует, почему это важно. Минимум 3-4 предложения]"""
-    
     default_system_prompt = "Ты журналист, который находит и структурирует главные новости дня. Всегда используй указанный формат с разделами ЗАГОЛОВОК и СОДЕРЖАНИЕ."
     
     try:
-        # Попытка чтения промпта из файла
+        # Чтение промпта ТОЛЬКО из файла
         prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "perplexity_news_prompt.txt"
         
         if prompt_path.exists():
@@ -94,17 +86,17 @@ def read_prompt_from_file():
                         # Если нет разделения, используем весь контент как пользовательский запрос
                         return default_system_prompt, content
             except Exception as e:
-                logger.warning(f"Ошибка при чтении файла с промптом: {str(e)}")
-                return default_system_prompt, default_prompt
+                logger.error(f"Ошибка при чтении файла с промптом: {str(e)}")
+                raise Exception(f"Не удалось прочитать промпт из файла: {str(e)}")
         
-        # Если файл не существует, возвращаем значения по умолчанию
-        logger.warning(f"Файл с промптом не найден: {prompt_path}")
-        return default_system_prompt, default_prompt
+        # Если файл не существует, это критическая ошибка
+        logger.error(f"Файл с промптом не найден: {prompt_path}")
+        raise Exception(f"Файл с промптом не найден: {prompt_path}")
     
     except Exception as e:
-        # В случае ошибки возвращаем значения по умолчанию
-        logger.error(f"Ошибка при чтении промпта из файла: {str(e)}")
-        return default_system_prompt, default_prompt
+        # В случае ошибки выбрасываем исключение
+        logger.error(f"Критическая ошибка при чтении промпта из файла: {str(e)}")
+        raise Exception(f"Критическая ошибка при чтении промпта из файла: {str(e)}")
 
 
 def call_perplexity_api_directly(exclude_news=None) -> Dict[str, Any]:

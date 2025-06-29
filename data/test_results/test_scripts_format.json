@@ -1,0 +1,119 @@
+{
+  "timestamp": "2025-06-29T18:21:26.355950",
+  "news_title": "### Верховный суд США поддержал Трампа в вопросе гражданства иностранцам\n\nВерховный суд США вынес...",
+  "scripts_count": 10,
+  "validation_results": [
+    {
+      "script_id": "B_2",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "C_1",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "B_1",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "A_2",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "D_1",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "A_1",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "C_2",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "D_2",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "E_1",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    },
+    {
+      "script_id": "E_2",
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        "Подпись пустая или стандартная"
+      ]
+    }
+  ],
+  "top_4_scripts": [
+    {
+      "script_id": "D_2",
+      "average_score": 84.2,
+      "writer_name": "Неизвестен",
+      "title": "Гражданство по рецепту Трампа"
+    },
+    {
+      "script_id": "D_1",
+      "average_score": 83.0,
+      "writer_name": "Неизвестен",
+      "title": "Ирония апелляционного гражданства"
+    },
+    {
+      "script_id": "E_2",
+      "average_score": 82.6,
+      "writer_name": "Неизвестен",
+      "title": "Гражданство с прецедентом и предлогом"
+    },
+    {
+      "script_id": "A_1",
+      "average_score": 81.2,
+      "writer_name": "Неизвестен",
+      "title": "Гражданство по рецепту: суд поддержал Трампа"
+    }
+  ],
+  "summary": {
+    "total_scripts": 10,
+    "valid_scripts": 10,
+    "scripts_with_errors": 0,
+    "scripts_with_warnings": 10
+  }
+}
