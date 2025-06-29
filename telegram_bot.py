@@ -64,6 +64,7 @@ class ComicBotTelegram:
         self.app = None
         self.manager = get_manager()
         self.admin_chat_id = TELEGRAM_ADMIN_CHAT_ID
+        self.rejected_news_list = []  # Список отклоненных новостей в текущей сессии
         
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /start - показать главное меню."""
@@ -177,6 +178,11 @@ class ComicBotTelegram:
                 await query.edit_message_text("✍️ Создаю сценарии...")
             else:
                 await self._send_status_message("✍️ Создаю сценарии...")
+            
+            # НОВАЯ ЛОГИКА: Очищаем список отклоненных новостей при одобрении
+            if self.rejected_news_list:
+                telegram_logger.info(f"🧹 Очищаю список отклоненных новостей ({len(self.rejected_news_list)} элементов)")
+                self.rejected_news_list.clear()
             
             # Генерация сценариев
             scripts = self.manager.generate_scripts()
@@ -376,7 +382,7 @@ class ComicBotTelegram:
             await self._send_error_message(f"❌ Ошибка при отправке изображения: {str(e)}")
     
     async def _regenerate_news(self, query):
-        """Перегенерация новости."""
+        """Перегенерация новости с накопительным списком исключений."""
         try:
             await query.edit_message_text("🔄 Получаю новую новость...")
         except:
@@ -388,18 +394,26 @@ class ComicBotTelegram:
                 await self._send_status_message("🔄 Получаю новую новость...")
         
         try:
-            # Принудительно получаем новую новость, исключая текущую
+            # Добавляем текущую новость в список отклоненных
             current_news = self.manager.news if hasattr(self.manager, 'news') else None
-            news = self.manager.collect_news(force_new_news=True, exclude_news=current_news)
+            if current_news and current_news not in self.rejected_news_list:
+                self.rejected_news_list.append(current_news)
+                telegram_logger.info(f"📝 Добавлена в список отклоненных: {current_news.get('title', 'Без заголовка')}")
+                telegram_logger.info(f"📋 Всего отклоненных новостей: {len(self.rejected_news_list)}")
+            
+            # Принудительно получаем новую новость, исключая ВСЕ отклоненные
+            news = self.manager.collect_news(force_new_news=True, exclude_news_list=self.rejected_news_list)
             if not news:
                 # Если не удалось получить новую новость, предлагаем использовать существующую
                 await self._send_error_message(
-                    "❌ Не удалось получить новую новость (возможно, проблемы с Perplexity API).\n"
+                    f"❌ Не удалось получить новую новость (исключено {len(self.rejected_news_list)} тем).\n"
+                    "Возможно, проблемы с Perplexity API или исчерпаны варианты новостей дня.\n"
                     "Попробуйте позже или продолжите с существующей новостью."
                 )
                 return
             
             telegram_logger.info(f"📰 Новая новость получена: {news.get('title', 'Без заголовка')}")
+            telegram_logger.info(f"🚫 Исключено тем: {len(self.rejected_news_list)}")
             
             # Отправляем новую новость для одобрения
             await self._send_news_for_approval(news)

@@ -17,13 +17,13 @@ from config import PERPLEXITY_API_KEY
 
 @handle_exceptions
 @retry_on_api_error(max_attempts=3)
-def get_top_news(force_new=False, exclude_news=None) -> Dict[str, Any]:
+def get_top_news(force_new=False, exclude_news_list=None) -> Dict[str, Any]:
     """
     Получение главной новости дня через прямой вызов Perplexity API.
     
     Args:
         force_new (bool): Принудительно получить новую новость, игнорируя кэш.
-        exclude_news (Dict[str, Any], optional): Новость, которую нужно исключить из поиска.
+        exclude_news_list (List[Dict[str, Any]], optional): Список новостей, которые нужно исключить из поиска.
     
     Returns:
         Dict[str, Any]: Информация о главной новости дня.
@@ -42,7 +42,7 @@ def get_top_news(force_new=False, exclude_news=None) -> Dict[str, Any]:
         
         # Прямой вызов Perplexity API
         logger.info("Получение новой новости через Perplexity API")
-        news = call_perplexity_api_directly(exclude_news=exclude_news)
+        news = call_perplexity_api_directly(exclude_news_list=exclude_news_list)
         
         # Сохраняем полученную новость в файл
         if news:
@@ -99,12 +99,12 @@ def read_prompt_from_file():
         raise Exception(f"Критическая ошибка при чтении промпта из файла: {str(e)}")
 
 
-def call_perplexity_api_directly(exclude_news=None) -> Dict[str, Any]:
+def call_perplexity_api_directly(exclude_news_list=None) -> Dict[str, Any]:
     """
     Прямой вызов Perplexity API для получения главной новости дня.
     
     Args:
-        exclude_news (Dict[str, Any], optional): Новость, которую нужно исключить из поиска.
+        exclude_news_list (List[Dict[str, Any]], optional): Список новостей, которые нужно исключить из поиска.
     
     Returns:
         Dict[str, Any]: Информация о главной новости дня.
@@ -118,18 +118,21 @@ def call_perplexity_api_directly(exclude_news=None) -> Dict[str, Any]:
     # Чтение промпта из файла
     system_prompt, user_prompt = read_prompt_from_file()
     
-    # Если нужно исключить определенную новость, добавляем это в промпт
-    if exclude_news:
-        exclude_title = exclude_news.get('title', '')
-        exclude_content = exclude_news.get('content', '')
+    # Если нужно исключить определенные новости, добавляем это в промпт
+    if exclude_news_list and len(exclude_news_list) > 0:
+        user_prompt += f"\n\nВАЖНО: НЕ предлагай новости на следующие темы (уже были предложены и отклонены):"
         
-        # Добавляем инструкцию исключить текущую новость
-        user_prompt += f"\n\nВАЖНО: Найди ДРУГУЮ новость, НЕ связанную с темой: \"{exclude_title}\""
-        if exclude_content:
-            # Берем первые 200 символов содержания для контекста
-            content_preview = exclude_content[:200] + "..." if len(exclude_content) > 200 else exclude_content
-            user_prompt += f"\nИсключи новости на тему: {content_preview}"
-        user_prompt += "\nНужна совершенно другая, независимая новость дня."
+        for i, exclude_news in enumerate(exclude_news_list, 1):
+            exclude_title = exclude_news.get('title', '')
+            exclude_content = exclude_news.get('content', '')
+            
+            user_prompt += f"\n{i}. Тема: \"{exclude_title}\""
+            if exclude_content:
+                # Берем первые 150 символов содержания для контекста
+                content_preview = exclude_content[:150] + "..." if len(exclude_content) > 150 else exclude_content
+                user_prompt += f" - {content_preview}"
+        
+        user_prompt += f"\n\nНайди совершенно ДРУГУЮ, независимую новость дня, НЕ связанную ни с одной из {len(exclude_news_list)} перечисленных выше тем."
     
     # ЛОГИРОВАНИЕ ОТПРАВЛЯЕМОГО ЗАПРОСА
     logger.info("=== ОТПРАВЛЯЕМЫЙ ЗАПРОС К PERPLEXITY API ===")
