@@ -1036,15 +1036,12 @@ class ComicBotTelegram:
                 
                 # Формируем текст анекдота
                 joke_text = f"🎭 *Анекдот от {author_name}*\n\n"
-                joke_text += f"*{joke_title}*\n\n"
                 
                 # Ограничиваем длину содержания
                 if len(joke_content) > 800:
-                    joke_text += f"{joke_content[:800]}...\n\n"
+                    joke_text += f"{joke_content[:800]}..."
                 else:
-                    joke_text += f"{joke_content}\n\n"
-                
-                joke_text += f"Автор: {author_name}"
+                    joke_text += f"{joke_content}"
                 
                 # Кнопки для выбора этого анекдота
                 keyboard = [
