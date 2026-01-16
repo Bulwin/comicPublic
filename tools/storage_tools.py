@@ -445,6 +445,36 @@ def store_scripts(scripts: List[Dict[str, Any]], date: Optional[datetime] = None
 
 
 @handle_exceptions
+def load_script(script_id: str, date: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+    """
+    Загрузка одного сценария по ID.
+    
+    Args:
+        script_id (str): Идентификатор сценария.
+        date (Optional[datetime], optional): Дата. По умолчанию None (текущая дата).
+        
+    Returns:
+        Optional[Dict[str, Any]]: Сценарий или None, если не найден.
+    """
+    try:
+        # Загружаем все сценарии за указанную дату
+        scripts = load_scripts(date)
+        
+        # Ищем сценарий по ID
+        for script in scripts:
+            if script.get("script_id") == script_id:
+                logger.info(f"Сценарий с ID {script_id} найден")
+                return script
+        
+        logger.warning(f"Сценарий с ID {script_id} не найден")
+        return None
+    
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке сценария {script_id}: {str(e)}")
+        return None
+
+
+@handle_exceptions
 def load_scripts(date: Optional[datetime] = None) -> List[Dict[str, Any]]:
     """
     Загрузка сценариев из файла.

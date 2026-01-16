@@ -147,7 +147,7 @@ def call_perplexity_api_directly(exclude_news_list=None) -> Dict[str, Any]:
     }
     
     payload = {
-        'model': 'llama-3.1-sonar-large-128k-online',
+        'model': 'sonar',
         'messages': [
             {
                 'role': 'system',

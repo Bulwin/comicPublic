@@ -28,7 +28,12 @@ from agents.manager import get_manager
 from utils import logger, important_logger
 from tools.publishing_tools import publish_comic_to_channel
 import config
-from config import USE_JURY_EVALUATION
+from utils.runtime_settings import (
+    get_generation_mode, set_generation_mode,
+    get_use_jury_evaluation, set_use_jury_evaluation,
+    get_scripts_per_writer, set_scripts_per_writer,
+    get_all_settings_formatted
+)
 from dotenv import load_dotenv
 
 # Загрузка переменных окружения
@@ -77,6 +82,7 @@ class ComicBotTelegram:
             [InlineKeyboardButton("🚀 Запустить процесс вручную", callback_data="manual_start")],
             [InlineKeyboardButton("🎭 Создать анекдот", callback_data="create_joke")],
             [InlineKeyboardButton("📊 Статус", callback_data="show_status")],
+            [InlineKeyboardButton("⚙️ Настройки генерации", callback_data="bot_settings")],
             [InlineKeyboardButton("🧪 Тест публикации", callback_data="test_publish")],
             [InlineKeyboardButton("⏰ Настройки расписания", callback_data="schedule_settings")]
         ]
@@ -187,6 +193,25 @@ class ComicBotTelegram:
             await self._schedule_joke(query)
         elif action == "approve_joke_publication":
             await self._approve_joke_publication(query)
+        
+        # ===== НАСТРОЙКИ ГЕНЕРАЦИИ =====
+        elif action == "bot_settings":
+            await self._show_bot_settings(query)
+        elif action == "settings_mode":
+            await self._show_mode_settings(query)
+        elif action == "settings_jury":
+            await self._show_jury_settings(query)
+        elif action == "settings_scripts":
+            await self._show_scripts_settings(query)
+        elif action.startswith("set_mode_"):
+            mode = action.replace("set_mode_", "")
+            await self._set_generation_mode(query, mode)
+        elif action.startswith("set_jury_"):
+            value = action == "set_jury_on"
+            await self._set_jury_evaluation(query, value)
+        elif action.startswith("set_scripts_"):
+            value = int(action.replace("set_scripts_", ""))
+            await self._set_scripts_per_writer(query, value)
     
     
     async def _continue_with_scripts(self, query=None):
@@ -208,8 +233,8 @@ class ComicBotTelegram:
                 await self._send_error_message("❌ Не удалось создать сценарии")
                 return
             
-            # Логика зависит от режима жюри
-            if USE_JURY_EVALUATION:
+            # Логика зависит от режима жюри (динамически из настроек)
+            if get_use_jury_evaluation():
                 # С жюри: оценка + выбор лучшего
                 evaluations = self.manager.evaluate_scripts()
                 if not evaluations:
@@ -820,8 +845,8 @@ class ComicBotTelegram:
                     script_info = result["script_info"]
                     script = script_info["script"]
                     
-                    # Формируем caption в зависимости от режима жюри
-                    if USE_JURY_EVALUATION:
+                    # Формируем caption в зависимости от режима жюри (динамически)
+                    if get_use_jury_evaluation():
                         caption = f"🏆 *Топ-{script_info['rank']} сценарий*\n\n"
                         caption += f"*{script.get('title', 'Без заголовка')}*\n"
                         caption += f"✍️ Автор: {script.get('writer_name', 'Неизвестен')}\n"
@@ -982,6 +1007,163 @@ class ComicBotTelegram:
                 await self._send_status_message("🖼️ Изображения готовы, но не найдены результаты")
         except Exception as e:
             telegram_logger.error(f"Ошибка при отправке уведомления о готовности изображений: {e}")
+    
+    # ===== МЕТОДЫ НАСТРОЕК ГЕНЕРАЦИИ =====
+    
+    async def _show_bot_settings(self, query):
+        """Показать главное меню настроек генерации."""
+        settings_text = get_all_settings_formatted()
+        settings_text += "\n📋 *Выберите настройку для изменения:*"
+        
+        keyboard = [
+            [InlineKeyboardButton("🤖 Режим генерации", callback_data="settings_mode")],
+            [InlineKeyboardButton("👨‍⚖️ Система жюри", callback_data="settings_jury")],
+            [InlineKeyboardButton("📝 Сценариев от автора", callback_data="settings_scripts")],
+            [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            settings_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_mode_settings(self, query):
+        """Показать настройки режима генерации."""
+        current_mode = get_generation_mode()
+        
+        mode_descriptions = {
+            "assistants": "GPT Assistants API\n   └ Промпты хранятся в OpenAI",
+            "gpt": "GPT API (прямой вызов)\n   └ Промпт из программы",
+            "gemini": "Google Gemini\n   └ Промпт из программы",
+            "claude": "Anthropic Claude\n   └ Промпт из программы"
+        }
+        
+        text = "🤖 *Режим генерации сценариев*\n\n"
+        text += f"Текущий режим: *{mode_descriptions.get(current_mode, current_mode).split(chr(10))[0]}*\n\n"
+        text += "📋 *Доступные режимы:*\n"
+        
+        for mode, desc in mode_descriptions.items():
+            marker = "✅" if mode == current_mode else "⭕"
+            text += f"\n{marker} *{desc}*\n"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔹 GPT Assistants", callback_data="set_mode_assistants")],
+            [InlineKeyboardButton("🔸 GPT API", callback_data="set_mode_gpt")],
+            [InlineKeyboardButton("💎 Gemini", callback_data="set_mode_gemini")],
+            [InlineKeyboardButton("🟣 Claude", callback_data="set_mode_claude")],
+            [InlineKeyboardButton("🔙 Назад к настройкам", callback_data="bot_settings")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_jury_settings(self, query):
+        """Показать настройки системы жюри."""
+        current_value = get_use_jury_evaluation()
+        
+        text = "👨‍⚖️ *Система оценки жюри*\n\n"
+        text += f"Текущее значение: *{'Включена' if current_value else 'Выключена'}*\n\n"
+        
+        text += "📋 *Описание режимов:*\n\n"
+        text += "✅ *Включено:*\n"
+        text += "   • Каждый автор создает 2 сценария\n"
+        text += "   • Жюри оценивает все сценарии\n"
+        text += "   • Изображения для топ-4\n\n"
+        
+        text += "❌ *Выключено:*\n"
+        text += "   • Каждый автор создает 1 сценарий\n"
+        text += "   • Случайный выбор победителя\n"
+        text += "   • Изображения для всех 5 сценариев\n"
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{'✅' if current_value else '⭕'} Включить жюри", callback_data="set_jury_on")],
+            [InlineKeyboardButton(f"{'✅' if not current_value else '⭕'} Выключить жюри", callback_data="set_jury_off")],
+            [InlineKeyboardButton("🔙 Назад к настройкам", callback_data="bot_settings")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_scripts_settings(self, query):
+        """Показать настройки количества сценариев."""
+        current_value = get_scripts_per_writer()
+        use_jury = get_use_jury_evaluation()
+        
+        text = "📝 *Сценариев от каждого автора*\n\n"
+        text += f"Текущее значение: *{current_value}*\n\n"
+        
+        if not use_jury:
+            text += "⚠️ *Внимание:* Эта настройка работает только при включенной системе жюри.\n\n"
+        
+        text += "📋 *Варианты:*\n"
+        text += f"{'✅' if current_value == 1 else '⭕'} 1 сценарий - быстрее, 5 сценариев всего\n"
+        text += f"{'✅' if current_value == 2 else '⭕'} 2 сценария - больше выбор, 10 сценариев всего\n"
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{'✅' if current_value == 1 else '⭕'} 1 сценарий", callback_data="set_scripts_1")],
+            [InlineKeyboardButton(f"{'✅' if current_value == 2 else '⭕'} 2 сценария", callback_data="set_scripts_2")],
+            [InlineKeyboardButton("🔙 Назад к настройкам", callback_data="bot_settings")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _set_generation_mode(self, query, mode: str):
+        """Установить режим генерации."""
+        try:
+            mode_names = {
+                "assistants": "GPT Assistants",
+                "gpt": "GPT API",
+                "gemini": "Gemini",
+                "claude": "Claude"
+            }
+            
+            set_generation_mode(mode)
+            telegram_logger.info(f"⚙️ Режим генерации изменен на: {mode}")
+            
+            await query.answer(f"✅ Режим изменен на {mode_names.get(mode, mode)}")
+            await self._show_mode_settings(query)
+            
+        except Exception as e:
+            await query.answer(f"❌ Ошибка: {str(e)}")
+    
+    async def _set_jury_evaluation(self, query, value: bool):
+        """Установить режим жюри."""
+        try:
+            set_use_jury_evaluation(value)
+            telegram_logger.info(f"⚙️ Система жюри: {'включена' if value else 'выключена'}")
+            
+            await query.answer(f"✅ Жюри {'включено' if value else 'выключено'}")
+            await self._show_jury_settings(query)
+            
+        except Exception as e:
+            await query.answer(f"❌ Ошибка: {str(e)}")
+    
+    async def _set_scripts_per_writer(self, query, value: int):
+        """Установить количество сценариев от автора."""
+        try:
+            set_scripts_per_writer(value)
+            telegram_logger.info(f"⚙️ Сценариев от автора: {value}")
+            
+            await query.answer(f"✅ Установлено {value} сценарий(а)")
+            await self._show_scripts_settings(query)
+            
+        except Exception as e:
+            await query.answer(f"❌ Ошибка: {str(e)}")
     
     # ===== НОВЫЕ МЕТОДЫ ДЛЯ АНЕКДОТОВ (НЕ ИЗМЕНЯЮТ СУЩЕСТВУЮЩИЙ ФУНКЦИОНАЛ) =====
     

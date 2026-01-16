@@ -1,6 +1,7 @@
 """
 Модуль агентов-сценаристов для проекта DailyComicBot.
-Отвечает за создание сценариев комиксов на основе новостей дня через Assistants API.
+Отвечает за создание сценариев комиксов на основе новостей дня.
+Поддерживает несколько режимов: Assistants API, GPT, Gemini, Claude.
 """
 
 import sys
@@ -10,12 +11,14 @@ from typing import Dict, Any, Optional
 # Импорт модулей проекта
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils import logger, handle_exceptions, measure_execution_time
+from utils.runtime_settings import get_generation_mode
 from config import SCRIPTWRITERS
 
 
 class ScriptwriterAgent:
     """
     Агент-сценарист, создающий сценарии комиксов на основе новостей дня.
+    Поддерживает разные LLM провайдеры в зависимости от настроек.
     """
     
     def __init__(self, writer_type: str):
@@ -38,7 +41,8 @@ class ScriptwriterAgent:
     @measure_execution_time
     def create_script(self, news: Dict[str, Any], script_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Создание сценария комикса на основе новости дня через Assistants API.
+        Создание сценария комикса на основе новости дня.
+        Использует LLM в зависимости от текущего режима генерации.
         
         Args:
             news (Dict[str, Any]): Информация о новости дня.
@@ -47,20 +51,29 @@ class ScriptwriterAgent:
         Returns:
             Dict[str, Any]: Сгенерированный сценарий.
         """
-        logger.info(f"Сценарист {self.name} начинает создание сценария через Assistants API")
+        mode = get_generation_mode()
+        mode_names = {
+            "assistants": "Assistants API",
+            "gpt": "GPT API",
+            "gemini": "Gemini API",
+            "claude": "Claude API"
+        }
+        
+        logger.info(f"Сценарист {self.name} начинает создание сценария через {mode_names.get(mode, mode)}")
         
         try:
-            # Используем Assistants API для генерации сценария
-            from utils.assistants_api import invoke_scriptwriter
+            # Используем универсальный LLM клиент
+            from utils.llm_clients import invoke_llm
             
-            script = invoke_scriptwriter(news, self.writer_type)
+            script = invoke_llm(news, self.writer_type, mode)
             
             if not script:
-                raise Exception("Assistants API вернул пустой результат")
+                raise Exception(f"{mode_names.get(mode, mode)} вернул пустой результат")
             
             # Добавление метаданных
             script["writer_type"] = self.writer_type
             script["writer_name"] = self.name
+            script["generation_mode"] = mode
             
             if script_id:
                 script["script_id"] = script_id
@@ -72,11 +85,11 @@ class ScriptwriterAgent:
                 script.get('title', 'Без названия')
             )
             
-            logger.info(f"Сценарий успешно создан через Assistants API для сценариста {self.writer_type}")
+            logger.info(f"Сценарий успешно создан через {mode_names.get(mode, mode)} для сценариста {self.writer_type}")
             return script
             
         except Exception as e:
-            logger.error(f"Ошибка при создании сценария через Assistants API: {str(e)}")
+            logger.error(f"Ошибка при создании сценария через {mode_names.get(mode, mode)}: {str(e)}")
             raise Exception(f"Не удалось создать сценарий для сценариста {self.writer_type}: {str(e)}")
 
 
