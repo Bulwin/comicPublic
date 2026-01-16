@@ -820,10 +820,16 @@ class ComicBotTelegram:
                     script_info = result["script_info"]
                     script = script_info["script"]
                     
-                    caption = f"🏆 *Топ-{script_info['rank']} сценарий*\n\n"
-                    caption += f"*{script.get('title', 'Без заголовка')}*\n"
-                    caption += f"✍️ Автор: {script.get('writer_name', 'Неизвестен')}\n"
-                    caption += f"🏆 Оценка жюри: {script_info['average_score']:.1f}/100\n\n"
+                    # Формируем caption в зависимости от режима жюри
+                    if USE_JURY_EVALUATION:
+                        caption = f"🏆 *Топ-{script_info['rank']} сценарий*\n\n"
+                        caption += f"*{script.get('title', 'Без заголовка')}*\n"
+                        caption += f"✍️ Автор: {script.get('writer_name', 'Неизвестен')}\n"
+                        caption += f"🏆 Оценка жюри: {script_info['average_score']:.1f}/100\n\n"
+                    else:
+                        caption = f"📝 *Сценарий #{script_info['rank']}*\n\n"
+                        caption += f"*{script.get('title', 'Без заголовка')}*\n"
+                        caption += f"✍️ Автор: {script.get('writer_name', 'Неизвестен')}\n\n"
                     
                     # Показываем краткое содержание
                     if script.get('format') == 'text':
