@@ -28,6 +28,7 @@ from agents.manager import get_manager
 from utils import logger, important_logger
 from tools.publishing_tools import publish_comic_to_channel
 import config
+from config import USE_JURY_EVALUATION
 from dotenv import load_dotenv
 
 # Загрузка переменных окружения
@@ -196,39 +197,56 @@ class ComicBotTelegram:
             else:
                 await self._send_status_message("✍️ Создаю сценарии...")
             
-            # НОВАЯ ЛОГИКА: Очищаем список отклоненных новостей при одобрении
+            # Очищаем список отклоненных новостей при одобрении
             if self.rejected_news_list:
                 telegram_logger.info(f"🧹 Очищаю список отклоненных новостей ({len(self.rejected_news_list)} элементов)")
                 self.rejected_news_list.clear()
             
-            # Генерация сценариев
+            # Генерация сценариев (количество зависит от USE_JURY_EVALUATION)
             scripts = self.manager.generate_scripts()
             if not scripts:
                 await self._send_error_message("❌ Не удалось создать сценарии")
                 return
             
-            # Оценка сценариев
-            evaluations = self.manager.evaluate_scripts()
-            if not evaluations:
-                await self._send_error_message("❌ Не удалось оценить сценарии")
-                return
+            # Логика зависит от режима жюри
+            if USE_JURY_EVALUATION:
+                # С жюри: оценка + выбор лучшего
+                evaluations = self.manager.evaluate_scripts()
+                if not evaluations:
+                    await self._send_error_message("❌ Не удалось оценить сценарии")
+                    return
+                
+                winner = self.manager.select_winner()
+                if not winner:
+                    await self._send_error_message("❌ Не удалось выбрать лучший сценарий")
+                    return
+                
+                await self._send_status_message("🖼️ Создаю изображения для топ-4 сценариев...")
+                top_scripts = self.manager.select_top_scripts(4)
+            else:
+                # Без жюри: случайный выбор, изображения для всех сценариев
+                winner = self.manager.select_random_winner()
+                if not winner:
+                    await self._send_error_message("❌ Не удалось выбрать сценарий")
+                    return
+                
+                await self._send_status_message(f"🖼️ Создаю изображения для всех {len(scripts)} сценариев...")
+                # Формируем список всех сценариев как "топ" для создания изображений
+                top_scripts = []
+                for i, script in enumerate(scripts):
+                    top_scripts.append({
+                        "script_id": script.get("script_id", f"script_{i+1}"),
+                        "script": script,
+                        "average_score": 0,  # Без оценки
+                        "std_dev": 0,
+                        "rank": i + 1
+                    })
             
-            # Выбор победителя
-            winner = self.manager.select_winner()
-            if not winner:
-                await self._send_error_message("❌ Не удалось выбрать лучший сценарий")
-                return
-            
-            # НОВАЯ ЛОГИКА: Сразу создаем топ-4 изображения
-            await self._send_status_message("🖼️ Создаю изображения для топ-4 сценариев...")
-            
-            # Получаем топ-4 сценария
-            top_scripts = self.manager.select_top_scripts(4)
             if not top_scripts:
-                await self._send_error_message("❌ Не удалось выбрать топ сценарии")
+                await self._send_error_message("❌ Не удалось выбрать сценарии для изображений")
                 return
             
-            # Создаем изображения для всех топ сценариев
+            # Создаем изображения для всех сценариев
             image_results = self.manager.create_images_for_top_scripts(top_scripts)
             if image_results and any(r["success"] for r in image_results):
                 await self._send_multiple_images_result(image_results)
