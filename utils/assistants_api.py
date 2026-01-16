@@ -26,10 +26,12 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # Импорт OpenAI API
+OpenAI = None
 try:
     from openai import OpenAI
 except ImportError:
     error("Не удалось импортировать модуль OpenAI. Установите его с помощью команды: pip install openai")
+    OpenAI = None
 
 
 def parse_text_evaluation(text: str) -> Dict[str, Any]:
@@ -207,6 +209,9 @@ class AssistantsManager:
         if not self.api_key:
             raise ValueError("API-ключ OpenAI не указан")
         
+        if OpenAI is None:
+            raise ImportError("Модуль OpenAI не установлен. Выполните: pip install openai")
+        
         self.client = OpenAI(api_key=self.api_key)
         
         # Загрузка ID ассистентов из переменных окружения
@@ -233,7 +238,7 @@ class AssistantsManager:
         info(f"Менеджер ассистентов инициализирован с {len(self.assistants)} ассистентами")
     
     @measure_execution_time
-    def create_assistant(self, name: str, instructions: str, tools: List[Dict[str, Any]] = None, model: str = "gpt-4") -> str:
+    def create_assistant(self, name: str, instructions: str, tools: List[Dict[str, Any]] = None, model: str = "gpt-5") -> str:
         """
         Создание нового ассистента.
         
@@ -806,7 +811,7 @@ class AssistantsManager:
 # Функции для работы с ассистентами
 
 @handle_exceptions
-def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-4") -> str:
+def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-5") -> str:
     """
     Создание ассистента-сценариста.
     
@@ -930,7 +935,7 @@ def create_scriptwriter_assistant(instructions: str = None, model: str = "gpt-4"
 
 
 @handle_exceptions
-def create_jury_assistant(instructions: str = None, model: str = "gpt-4") -> str:
+def create_jury_assistant(instructions: str = None, model: str = "gpt-5") -> str:
     """
     Создание ассистента-жюри.
     

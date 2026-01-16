@@ -19,7 +19,7 @@ from tools import (
     publish_to_all_platforms, format_caption, store_news, store_scripts
 )
 import config
-from config import SCRIPTWRITERS, COMIC_PANELS
+from config import SCRIPTWRITERS, COMIC_PANELS, USE_JURY_EVALUATION, SCRIPTS_PER_WRITER
 
 
 class ManagerAgent:
@@ -96,10 +96,18 @@ class ManagerAgent:
         """
         Генерация сценариев комиксов.
         
+        Количество сценариев зависит от настроек:
+        - USE_JURY_EVALUATION=True: SCRIPTS_PER_WRITER сценариев от каждого автора (по умолчанию 2)
+        - USE_JURY_EVALUATION=False: 1 сценарий от каждого автора
+        
         Returns:
             List[Dict[str, Any]]: Список сгенерированных сценариев.
         """
         logger.info("Начало генерации сценариев")
+        
+        # Определяем количество сценариев от каждого автора
+        scripts_count = SCRIPTS_PER_WRITER if USE_JURY_EVALUATION else 1
+        logger.info(f"Режим жюри: {'ВКЛ' if USE_JURY_EVALUATION else 'ВЫКЛ'}, сценариев от каждого автора: {scripts_count}")
         
         # Проверка наличия новости
         if not self.news:
@@ -116,8 +124,8 @@ class ManagerAgent:
         for writer_type, writer_info in SCRIPTWRITERS.items():
             logger.info(f"Подготовка генерации сценариев для сценариста {writer_type}: {writer_info['name']}")
             
-            # Создаем две задачи для каждого сценариста
-            for i in range(2):
+            # Создаем задачи для каждого сценариста (количество зависит от настроек)
+            for i in range(scripts_count):
                 script_id = f"{writer_type}_{i+1}"
                 script_tasks.append((writer_type, writer_info, script_id, i+1))
                 
@@ -484,7 +492,7 @@ class ManagerAgent:
                     
                     # Отправляем запрос к API
                     response = client.chat.completions.create(
-                        model="gpt-4",  # Используем GPT-4 для лучшего качества
+                        model="gpt-5",  # Используем GPT-5 для лучшего качества (обновлено январь 2026)
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt}
@@ -687,6 +695,49 @@ class ManagerAgent:
         """
         top_scripts = self.select_top_scripts(1)
         return top_scripts[0] if top_scripts else None
+    
+    def select_random_winner(self) -> Optional[Dict[str, Any]]:
+        """
+        Случайный выбор сценария-победителя (когда жюри отключено).
+        
+        Используется когда USE_JURY_EVALUATION = False.
+        Выбирает случайный сценарий из списка без оценки жюри.
+        
+        Returns:
+            Optional[Dict[str, Any]]: Информация о случайном сценарии-победителе или None.
+        """
+        import random
+        
+        logger.info("Случайный выбор победителя (жюри отключено)")
+        
+        if not self.scripts:
+            logger.error("Невозможно выбрать победителя: нет сценариев")
+            return None
+        
+        # Выбираем случайный сценарий
+        winner = random.choice(self.scripts)
+        
+        # Устанавливаем победителя
+        self.winner_script = winner
+        self.winner_score = 0  # Без оценки жюри
+        
+        # Логирование выбора
+        logger.info(f"Случайно выбран победитель: {winner['script_id']} от {winner['writer_name']}")
+        important_logger.log_winner_selection(
+            winner["script_id"],
+            winner["writer_name"],
+            winner.get("title", "Без названия"),
+            0  # Без оценки
+        )
+        
+        # Возвращаем в формате совместимом с select_winner()
+        return {
+            "script_id": winner["script_id"],
+            "script": winner,
+            "average_score": 0,
+            "std_dev": 0,
+            "rank": 1
+        }
     
     @measure_execution_time
     def create_images_for_top_scripts(self, top_scripts: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
@@ -994,8 +1045,8 @@ class ManagerAgent:
         """
         logger.info("Начало сохранения истории")
         
-        # Проверка наличия необходимых данных
-        if not self.news or not self.scripts or not self.evaluations or not self.winner_script:
+        # Проверка наличия необходимых данных (оценки не обязательны если жюри отключено)
+        if not self.news or not self.scripts or not self.winner_script:
             logger.error("Невозможно сохранить историю: недостаточно данных")
             return False
         
@@ -1005,11 +1056,7 @@ class ManagerAgent:
                 "date": datetime.now().isoformat(),
                 "news": self.news,
                 "scripts": self.scripts,
-                "evaluations": {k: {
-                    "average_score": v["average_score"],
-                    "scores_std_dev": v["scores_std_dev"],
-                    "evaluations": v["evaluations"]
-                } for k, v in self.evaluations.items()},
+                "mode": "jury" if USE_JURY_EVALUATION else "random",
                 "winner": {
                     "script_id": self.winner_script["script_id"],
                     "title": self.winner_script["title"],
@@ -1018,6 +1065,16 @@ class ManagerAgent:
                 "image_path": self.image_path,
                 "publication_results": self.publication_results
             }
+            
+            # Добавляем оценки только если жюри было включено
+            if USE_JURY_EVALUATION and self.evaluations:
+                history_data["evaluations"] = {k: {
+                    "average_score": v["average_score"],
+                    "scores_std_dev": v["scores_std_dev"],
+                    "evaluations": v["evaluations"]
+                } for k, v in self.evaluations.items()}
+            else:
+                history_data["evaluations"] = {"skipped": True, "reason": "USE_JURY_EVALUATION=False"}
             
             # Сохранение данных
             success = store_daily_data(history_data)
@@ -1038,6 +1095,10 @@ class ManagerAgent:
         """
         Запуск полного процесса создания и публикации комикса.
         
+        Процесс зависит от настройки USE_JURY_EVALUATION:
+        - True: 10 сценариев -> оценка жюри -> выбор лучшего -> генерация изображения
+        - False: 5 сценариев (по 1 от автора) -> случайный выбор -> генерация изображения
+        
         Args:
             force_new_news (bool): Принудительно получить новую новость.
         
@@ -1045,10 +1106,12 @@ class ManagerAgent:
             Dict[str, Any]: Результаты выполнения процесса.
         """
         logger.info("Запуск полного процесса создания и публикации комикса")
+        logger.info(f"Режим жюри: {'ВКЛ' if USE_JURY_EVALUATION else 'ВЫКЛ'}")
         
         results = {
             "success": False,
-            "steps": {}
+            "steps": {},
+            "mode": "jury" if USE_JURY_EVALUATION else "random"
         }
         
         # Шаг 1: Сбор новостей
@@ -1077,31 +1140,50 @@ class ManagerAgent:
             results["steps"]["generate_scripts"] = {"success": False, "error": str(e)}
             return results
         
-        # Шаг 3: Оценка сценариев
-        try:
-            evaluations = self.evaluate_scripts()
-            results["steps"]["evaluate_scripts"] = {"success": bool(evaluations), "count": len(evaluations)}
-            
-            if not evaluations:
-                logger.error("Процесс остановлен: не удалось оценить сценарии")
+        # Шаг 3 и 4: Оценка сценариев и выбор победителя (зависит от режима)
+        if USE_JURY_EVALUATION:
+            # Режим с жюри: оценка всех сценариев
+            try:
+                evaluations = self.evaluate_scripts()
+                results["steps"]["evaluate_scripts"] = {"success": bool(evaluations), "count": len(evaluations)}
+                
+                if not evaluations:
+                    logger.error("Процесс остановлен: не удалось оценить сценарии")
+                    return results
+            except Exception as e:
+                logger.error(f"Ошибка при оценке сценариев: {str(e)}")
+                results["steps"]["evaluate_scripts"] = {"success": False, "error": str(e)}
                 return results
-        except Exception as e:
-            logger.error(f"Ошибка при оценке сценариев: {str(e)}")
-            results["steps"]["evaluate_scripts"] = {"success": False, "error": str(e)}
-            return results
-        
-        # Шаг 4: Выбор победителя
-        try:
-            winner = self.select_winner()
-            results["steps"]["select_winner"] = {"success": bool(winner), "data": winner}
             
-            if not winner:
-                logger.error("Процесс остановлен: не удалось выбрать победителя")
+            # Выбор победителя по оценкам жюри
+            try:
+                winner = self.select_winner()
+                results["steps"]["select_winner"] = {"success": bool(winner), "data": winner, "method": "jury"}
+                
+                if not winner:
+                    logger.error("Процесс остановлен: не удалось выбрать победителя")
+                    return results
+            except Exception as e:
+                logger.error(f"Ошибка при выборе победителя: {str(e)}")
+                results["steps"]["select_winner"] = {"success": False, "error": str(e)}
                 return results
-        except Exception as e:
-            logger.error(f"Ошибка при выборе победителя: {str(e)}")
-            results["steps"]["select_winner"] = {"success": False, "error": str(e)}
-            return results
+        else:
+            # Режим без жюри: пропускаем оценку, случайный выбор
+            logger.info("Пропуск оценки жюри (USE_JURY_EVALUATION=False)")
+            results["steps"]["evaluate_scripts"] = {"success": True, "skipped": True, "reason": "USE_JURY_EVALUATION=False"}
+            
+            # Случайный выбор победителя
+            try:
+                winner = self.select_random_winner()
+                results["steps"]["select_winner"] = {"success": bool(winner), "data": winner, "method": "random"}
+                
+                if not winner:
+                    logger.error("Процесс остановлен: не удалось выбрать победителя")
+                    return results
+            except Exception as e:
+                logger.error(f"Ошибка при случайном выборе победителя: {str(e)}")
+                results["steps"]["select_winner"] = {"success": False, "error": str(e)}
+                return results
         
         # Шаг 5: Создание изображения
         try:
