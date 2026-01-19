@@ -137,13 +137,18 @@ class ComicBotTelegram:
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка нажатий на кнопки."""
         query = update.callback_query
-        await query.answer()
+        
+        try:
+            await query.answer()
+        except Exception as e:
+            telegram_logger.error(f"Ошибка answer(): {e}")
         
         if not self._is_admin_callback(query):
             await query.edit_message_text("❌ У вас нет прав для использования этого бота.")
             return
         
         action = query.data
+        telegram_logger.info(f"📍 Callback: action={action}")
         
         # Новые действия главного меню
         if action == "manual_start":
@@ -225,7 +230,8 @@ class ComicBotTelegram:
             await self._select_simple_result(query, index)
         elif action == "regenerate_simple":
             await self._regenerate_simple(query)
-    
+        else:
+            telegram_logger.warning(f"⚠️ Неизвестное действие: {action}")
     
     async def _continue_with_scripts(self, query=None):
         """Продолжение с созданием сценариев."""
