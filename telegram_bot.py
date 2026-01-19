@@ -1384,19 +1384,30 @@ class ComicBotTelegram:
     async def _set_content_mode(self, query, mode: str):
         """Установить режим контента."""
         try:
+            telegram_logger.info(f"🎨 Установка режима контента: {mode}")
+            
             mode_names = {
                 "comic": "4-панельный комикс",
                 "simple_image": "Шутка + картинка"
             }
             
+            telegram_logger.info(f"🎨 Вызов set_content_mode({mode})...")
             set_content_mode(mode)
             telegram_logger.info(f"⚙️ Режим контента изменен на: {mode}")
             
             await query.answer(f"✅ Режим: {mode_names.get(mode, mode)}")
+            telegram_logger.info(f"🎨 Обновление UI настроек...")
             await self._show_content_settings(query)
+            telegram_logger.info(f"🎨 Готово!")
             
         except Exception as e:
-            await query.answer(f"❌ Ошибка: {str(e)}")
+            telegram_logger.error(f"❌ Ошибка _set_content_mode: {e}")
+            import traceback
+            telegram_logger.error(f"Traceback: {traceback.format_exc()}")
+            try:
+                await query.answer(f"❌ Ошибка: {str(e)}")
+            except:
+                pass
     
     # ===== НОВЫЕ МЕТОДЫ ДЛЯ АНЕКДОТОВ (НЕ ИЗМЕНЯЮТ СУЩЕСТВУЮЩИЙ ФУНКЦИОНАЛ) =====
     
