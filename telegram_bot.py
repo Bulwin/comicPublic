@@ -218,20 +218,36 @@ class ComicBotTelegram:
         elif action.startswith("set_content_"):
             mode = action.replace("set_content_", "")
             await self._set_content_mode(query, mode)
+        
+        # ===== РЕЖИМ SIMPLE_IMAGE =====
+        elif action.startswith("select_simple_"):
+            index = int(action.replace("select_simple_", ""))
+            await self._select_simple_result(query, index)
+        elif action == "regenerate_simple":
+            await self._regenerate_simple(query)
     
     
     async def _continue_with_scripts(self, query=None):
         """Продолжение с созданием сценариев."""
         try:
-            if query:
-                await query.edit_message_text("✍️ Создаю сценарии...")
-            else:
-                await self._send_status_message("✍️ Создаю сценарии...")
-            
             # Очищаем список отклоненных новостей при одобрении
             if self.rejected_news_list:
                 telegram_logger.info(f"🧹 Очищаю список отклоненных новостей ({len(self.rejected_news_list)} элементов)")
                 self.rejected_news_list.clear()
+            
+            # Проверяем режим контента
+            content_mode = get_content_mode()
+            
+            if content_mode == "simple_image":
+                # НОВЫЙ РЕЖИМ: Шутка + картинка + анекдот
+                await self._continue_with_simple_image(query)
+                return
+            
+            # СТАРЫЙ РЕЖИМ: 4-панельный комикс
+            if query:
+                await query.edit_message_text("✍️ Создаю сценарии комиксов...")
+            else:
+                await self._send_status_message("✍️ Создаю сценарии комиксов...")
             
             # Генерация сценариев (количество зависит от USE_JURY_EVALUATION)
             scripts = self.manager.generate_scripts()
@@ -286,6 +302,154 @@ class ComicBotTelegram:
                 
         except Exception as e:
             await self._send_error_message(f"❌ Ошибка при создании сценариев: {str(e)}")
+    
+    async def _continue_with_simple_image(self, query=None):
+        """НОВЫЙ РЕЖИМ: Создание шутки + промпта для Sora + анекдота."""
+        try:
+            if query:
+                await query.edit_message_text("🎨 Создаю контент (шутка + картинка + анекдот)...")
+            else:
+                await self._send_status_message("🎨 Создаю контент от всех авторов...")
+            
+            # Импортируем функцию для режима simple_image
+            from utils.llm_clients import invoke_llm_simple_image
+            
+            # Генерируем контент от каждого автора
+            results = []
+            for writer_type in ['A', 'B', 'C', 'D', 'E']:
+                try:
+                    await self._send_status_message(f"✍️ Автор {SCRIPTWRITERS[writer_type]['name']} работает...")
+                    
+                    result = invoke_llm_simple_image(self.manager.news, writer_type)
+                    result['writer_type'] = writer_type
+                    result['writer_name'] = SCRIPTWRITERS[writer_type]['name']
+                    results.append(result)
+                    
+                    telegram_logger.info(f"✅ Контент от {writer_type}: {result.get('title', 'OK')}")
+                except Exception as e:
+                    telegram_logger.error(f"❌ Ошибка автора {writer_type}: {e}")
+            
+            if not results:
+                await self._send_error_message("❌ Не удалось создать контент")
+                return
+            
+            # Сохраняем результаты
+            self.manager.simple_image_results = results
+            
+            # Отправляем результаты для выбора
+            await self._send_simple_image_results(results)
+            
+        except Exception as e:
+            await self._send_error_message(f"❌ Ошибка при создании контента: {str(e)}")
+    
+    async def _send_simple_image_results(self, results: List[Dict[str, Any]]):
+        """Отправка результатов режима simple_image для выбора."""
+        try:
+            info_text = f"🎨 *Создано {len(results)} вариантов контента*\n\n"
+            info_text += f"📰 Новость: {self.manager.news.get('title', 'Без заголовка')}\n\n"
+            info_text += "Выберите лучший вариант:"
+            
+            await self.app.bot.send_message(
+                chat_id=self.admin_chat_id,
+                text=info_text,
+                parse_mode='Markdown'
+            )
+            
+            # Отправляем каждый результат
+            for i, result in enumerate(results):
+                text = f"📝 *Вариант #{i+1} от {result.get('writer_name', 'Автор')}*\n\n"
+                text += f"*{result.get('title', 'Без заголовка')}*\n\n"
+                
+                text += f"😂 *Шутка:*\n{result.get('joke', 'Нет шутки')}\n\n"
+                
+                text += f"🖼️ *Промпт для Sora:*\n`{result.get('sora_prompt', 'No prompt')[:200]}...`\n\n"
+                
+                anecdote = result.get('anecdote', 'Нет анекдота')
+                if len(anecdote) > 300:
+                    text += f"🎭 *Анекдот:*\n{anecdote[:300]}...\n"
+                else:
+                    text += f"🎭 *Анекдот:*\n{anecdote}\n"
+                
+                keyboard = [
+                    [InlineKeyboardButton(f"✅ Выбрать этот вариант", callback_data=f"select_simple_{i}")],
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await self.app.bot.send_message(
+                    chat_id=self.admin_chat_id,
+                    text=text,
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+            
+            # Кнопки управления
+            general_keyboard = [
+                [InlineKeyboardButton("🔄 Пересоздать контент", callback_data="regenerate_simple")],
+                [InlineKeyboardButton("🔄 Новая новость", callback_data="regenerate_news")],
+                [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+            ]
+            general_reply_markup = InlineKeyboardMarkup(general_keyboard)
+            
+            await self.app.bot.send_message(
+                chat_id=self.admin_chat_id,
+                text="🎯 *Или выберите другое действие:*",
+                parse_mode='Markdown',
+                reply_markup=general_reply_markup
+            )
+            
+        except Exception as e:
+            await self._send_error_message(f"❌ Ошибка при отправке результатов: {str(e)}")
+    
+    async def _select_simple_result(self, query, index: int):
+        """Выбор результата в режиме simple_image."""
+        try:
+            if not hasattr(self.manager, 'simple_image_results') or not self.manager.simple_image_results:
+                await self._send_error_message("❌ Результаты не найдены")
+                return
+            
+            if index >= len(self.manager.simple_image_results):
+                await self._send_error_message("❌ Неверный индекс результата")
+                return
+            
+            selected = self.manager.simple_image_results[index]
+            await query.edit_message_text(f"✅ Выбран вариант от {selected.get('writer_name', 'Автор')}!")
+            
+            # Сохраняем выбранный результат
+            self.manager.selected_simple_result = selected
+            
+            # Показываем полный результат с кнопками действий
+            text = f"🎨 *Выбранный контент:*\n\n"
+            text += f"*{selected.get('title', 'Без заголовка')}*\n\n"
+            text += f"😂 *Шутка:*\n{selected.get('joke', 'Нет')}\n\n"
+            text += f"🖼️ *Промпт для Sora:*\n```\n{selected.get('sora_prompt', 'No prompt')}\n```\n\n"
+            text += f"🎭 *Анекдот:*\n{selected.get('anecdote', 'Нет')}\n\n"
+            text += f"✍️ Автор: {selected.get('writer_name', 'Неизвестен')}"
+            
+            keyboard = [
+                [InlineKeyboardButton("📋 Скопировать промпт Sora", callback_data="copy_sora_prompt")],
+                [InlineKeyboardButton("🔄 Выбрать другой вариант", callback_data="regenerate_simple")],
+                [InlineKeyboardButton("🔄 Новая новость", callback_data="regenerate_news")],
+                [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await self.app.bot.send_message(
+                chat_id=self.admin_chat_id,
+                text=text,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            await self._send_error_message(f"❌ Ошибка при выборе результата: {str(e)}")
+    
+    async def _regenerate_simple(self, query):
+        """Перегенерация контента в режиме simple_image."""
+        try:
+            await query.edit_message_text("🔄 Пересоздаю контент...")
+            await self._continue_with_simple_image()
+        except Exception as e:
+            await self._send_error_message(f"❌ Ошибка при перегенерации: {str(e)}")
     
     async def _continue_with_image(self, query=None):
         """Продолжение с созданием изображений для топ-4 сценариев."""
