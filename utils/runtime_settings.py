@@ -17,7 +17,10 @@ _settings_lock = threading.Lock()
 # Значения по умолчанию
 DEFAULT_SETTINGS = {
     # Режим генерации: "assistants", "gpt", "gemini", "claude"
-    "generation_mode": "assistants",
+    "generation_mode": "gpt",
+    
+    # Режим контента: "comic" (4-панельный комикс) или "simple_image" (шутка + картинка + анекдот)
+    "content_mode": "simple_image",
     
     # Использовать ли систему жюри
     "use_jury_evaluation": False,
@@ -185,6 +188,27 @@ def set_scripts_per_writer(value: int) -> bool:
     return set_setting("scripts_per_writer", int(value))
 
 
+def get_content_mode() -> str:
+    """Возвращает текущий режим контента."""
+    return get_setting("content_mode", "simple_image")
+
+
+def set_content_mode(mode: str) -> bool:
+    """
+    Устанавливает режим контента.
+    
+    Args:
+        mode: "comic" или "simple_image"
+        
+    Returns:
+        bool: True если успешно.
+    """
+    valid_modes = ["comic", "simple_image"]
+    if mode not in valid_modes:
+        raise ValueError(f"Недопустимый режим: {mode}. Доступные: {valid_modes}")
+    return set_setting("content_mode", mode)
+
+
 def get_all_settings_formatted() -> str:
     """
     Возвращает форматированную строку со всеми настройками.
@@ -201,7 +225,13 @@ def get_all_settings_formatted() -> str:
         "claude": "Claude"
     }
     
+    content_mode_names = {
+        "comic": "4-панельный комикс",
+        "simple_image": "Шутка + картинка"
+    }
+    
     text = "⚙️ *Текущие настройки:*\n\n"
+    text += f"🎨 Режим контента: *{content_mode_names.get(settings.get('content_mode', 'simple_image'), settings.get('content_mode'))}*\n"
     text += f"🤖 Режим генерации: *{mode_names.get(settings['generation_mode'], settings['generation_mode'])}*\n"
     text += f"👨‍⚖️ Система жюри: *{'Включена' if settings['use_jury_evaluation'] else 'Выключена'}*\n"
     text += f"📝 Сценариев от автора: *{settings['scripts_per_writer']}*\n"

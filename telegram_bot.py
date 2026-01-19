@@ -32,6 +32,7 @@ from utils.runtime_settings import (
     get_generation_mode, set_generation_mode,
     get_use_jury_evaluation, set_use_jury_evaluation,
     get_scripts_per_writer, set_scripts_per_writer,
+    get_content_mode, set_content_mode,
     get_all_settings_formatted
 )
 from dotenv import load_dotenv
@@ -212,6 +213,11 @@ class ComicBotTelegram:
         elif action.startswith("set_scripts_"):
             value = int(action.replace("set_scripts_", ""))
             await self._set_scripts_per_writer(query, value)
+        elif action == "settings_content":
+            await self._show_content_settings(query)
+        elif action.startswith("set_content_"):
+            mode = action.replace("set_content_", "")
+            await self._set_content_mode(query, mode)
     
     
     async def _continue_with_scripts(self, query=None):
@@ -1016,6 +1022,7 @@ class ComicBotTelegram:
         settings_text += "\n📋 *Выберите настройку для изменения:*"
         
         keyboard = [
+            [InlineKeyboardButton("🎨 Режим контента", callback_data="settings_content")],
             [InlineKeyboardButton("🤖 Режим генерации", callback_data="settings_mode")],
             [InlineKeyboardButton("👨‍⚖️ Система жюри", callback_data="settings_jury")],
             [InlineKeyboardButton("📝 Сценариев от автора", callback_data="settings_scripts")],
@@ -1161,6 +1168,55 @@ class ComicBotTelegram:
             
             await query.answer(f"✅ Установлено {value} сценарий(а)")
             await self._show_scripts_settings(query)
+            
+        except Exception as e:
+            await query.answer(f"❌ Ошибка: {str(e)}")
+    
+    async def _show_content_settings(self, query):
+        """Показать настройки режима контента."""
+        current_mode = get_content_mode()
+        
+        text = "🎨 *Режим контента*\n\n"
+        text += f"Текущий режим: *{'4-панельный комикс' if current_mode == 'comic' else 'Шутка + картинка'}*\n\n"
+        
+        text += "📋 *Доступные режимы:*\n\n"
+        
+        text += f"{'✅' if current_mode == 'comic' else '⭕'} *4-панельный комикс*\n"
+        text += "   • Сценарий с 4 панелями\n"
+        text += "   • Диалоги персонажей\n"
+        text += "   • Старый функционал\n\n"
+        
+        text += f"{'✅' if current_mode == 'simple_image' else '⭕'} *Шутка + картинка*\n"
+        text += "   • Короткая шутка/подпись\n"
+        text += "   • Промпт для Sora (картинка)\n"
+        text += "   • Короткий анекдот\n"
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{'✅' if current_mode == 'comic' else '⭕'} 4-панельный комикс", callback_data="set_content_comic")],
+            [InlineKeyboardButton(f"{'✅' if current_mode == 'simple_image' else '⭕'} Шутка + картинка", callback_data="set_content_simple_image")],
+            [InlineKeyboardButton("🔙 Назад к настройкам", callback_data="bot_settings")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _set_content_mode(self, query, mode: str):
+        """Установить режим контента."""
+        try:
+            mode_names = {
+                "comic": "4-панельный комикс",
+                "simple_image": "Шутка + картинка"
+            }
+            
+            set_content_mode(mode)
+            telegram_logger.info(f"⚙️ Режим контента изменен на: {mode}")
+            
+            await query.answer(f"✅ Режим: {mode_names.get(mode, mode)}")
+            await self._show_content_settings(query)
             
         except Exception as e:
             await query.answer(f"❌ Ошибка: {str(e)}")
