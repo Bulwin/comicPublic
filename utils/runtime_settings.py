@@ -11,8 +11,8 @@ import threading
 # Путь к файлу настроек
 SETTINGS_FILE = Path(__file__).resolve().parent.parent / "data" / "runtime_settings.json"
 
-# Lock для потокобезопасности
-_settings_lock = threading.Lock()
+# Lock для потокобезопасности (RLock позволяет рекурсивный захват)
+_settings_lock = threading.RLock()
 
 # Значения по умолчанию
 DEFAULT_SETTINGS = {
