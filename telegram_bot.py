@@ -1188,8 +1188,15 @@ class ComicBotTelegram:
     
     async def _show_bot_settings(self, query):
         """Показать главное меню настроек генерации."""
-        settings_text = get_all_settings_formatted()
-        settings_text += "\n📋 *Выберите настройку для изменения:*"
+        try:
+            telegram_logger.info("⚙️ Открытие настроек...")
+            settings_text = get_all_settings_formatted()
+            settings_text += "\n📋 *Выберите настройку для изменения:*"
+        except Exception as e:
+            telegram_logger.error(f"❌ Ошибка загрузки настроек: {e}")
+            import traceback
+            telegram_logger.error(f"Traceback: {traceback.format_exc()}")
+            settings_text = "⚙️ *Настройки генерации*\n\n❌ Ошибка загрузки настроек\n\n📋 *Выберите настройку:*"
         
         keyboard = [
             [InlineKeyboardButton("🎨 Режим контента", callback_data="settings_content")],
