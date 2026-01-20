@@ -12,8 +12,8 @@ client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 client.connect(host, username=user, password=password, timeout=30)
 
-# Перезапустить и посмотреть логи
-cmd = 'systemctl restart dailycomicbot && sleep 3 && journalctl -u dailycomicbot -n 10 --no-pager'
+# Посмотреть свежие логи
+cmd = 'journalctl -u dailycomicbot -n 30 --no-pager'
 print(f'>>> {cmd}')
 stdin, stdout, stderr = client.exec_command(cmd, timeout=60)
 output = stdout.read().decode('utf-8', errors='ignore')

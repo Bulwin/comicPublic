@@ -5,45 +5,45 @@
 
 ## Что нужно создать:
 
-1. **Шутка** - короткая юмористическая фраза/подпись к картинке (1-3 предложения)
-2. **Промпт для Sora** - детальное описание для генерации изображения AI (на английском языке!)
+1. **Шутка-подпись** - короткая юмористическая фраза для картинки (1-2 предложения, макс 10-15 слов)
+2. **Промпт для Sora** - описание картинки С ТЕКСТОМ ШУТКИ (на английском!)
 3. **Анекдот** - короткий анекдот на тему новости (3-7 строк)
 
-## Требования к промпту для Sora:
-- Описание должно быть на АНГЛИЙСКОМ языке
-- Описывай визуальную сцену детально: персонажей, их позы, эмоции, окружение
-- Стиль: яркий, мультяшный, юмористический
-- НЕ включай текст в изображение (без надписей, без речевых пузырей)
-- Сцена должна быть понятна без слов
+## ВАЖНО для промпта Sora:
+- Описание на АНГЛИЙСКОМ языке
+- ОБЯЗАТЕЛЬНО включи текст шутки в картинку как caption/подпись/надпись
+- Стиль: яркий, мультяшный, юмористический, карикатура
+- Сцена должна иллюстрировать шутку визуально
+- Укажи где и как разместить текст (например: "text at top/bottom saying...")
 
 ## КРИТИЧЕСКИ ВАЖНО:
-Ответ ДОЛЖЕН быть в формате JSON:
+Ответ ТОЛЬКО в формате JSON:
 
 ```json
 {{
-  "title": "Заголовок/название работы",
-  "joke": "Шутка - короткая юмористическая подпись к картинке",
-  "sora_prompt": "Detailed description in English for image generation. Cartoon style, vibrant colors, humorous scene depicting...",
-  "anecdote": "Короткий анекдот на тему новости.\nС переносами строк.\nДиалоги персонажей или ситуация."
+  "title": "Заголовок работы",
+  "joke": "Короткая шутка на русском (10-15 слов макс)",
+  "joke_en": "Same joke translated to English for image",
+  "sora_prompt": "Cartoon style illustration. [Scene description]. Text caption at bottom saying: '[joke_en text]'. Vibrant colors, humorous style.",
+  "anecdote": "Короткий анекдот на русском.\nС переносами строк."
 }}
 ```
 
-## Примеры хороших шуток (для понимания стиля):
-- "Когда сказали 'работаем до результата', но не уточнили чьего"
-- "Ожидание: заработаю миллион. Реальность: заработал опыт"
-- "Эксперты советуют экономить. Эксперты явно не видели мои счета"
+## Примеры шуток:
+- "Когда сказали 'работаем до результата'"
+- "Ожидание vs реальность"
+- "Типичный понедельник"
 
-## Примеры промптов для Sora:
-- "Cartoon style illustration of a confused office worker staring at a giant stack of papers, papers flying everywhere, exaggerated shocked expression, bright colorful office environment, humorous style"
-- "Vibrant cartoon scene of a cat wearing a business suit sitting at a CEO desk, looking smug, other animals in suits looking confused in background, corporate office setting"
+## Пример промпта для Sora С ТЕКСТОМ:
+"Cartoon style humorous illustration of a confused cat staring at a laptop screen with spreadsheets. Bold text caption at bottom: 'When they said work from home would be easy'. Bright colors, exaggerated expressions, office humor style."
 
 ## Пример анекдота:
 ```
-— Шеф, у нас проблема с бюджетом!
+— Шеф, у нас проблема!
 — Какая?
-— Он закончился.
+— Бюджет закончился.
 — И в чём проблема?
 — Месяц только начался.
 ```
 
-Отвечай ТОЛЬКО валидным JSON без дополнительного текста!
+Отвечай ТОЛЬКО валидным JSON!

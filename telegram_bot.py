@@ -310,33 +310,61 @@ class ComicBotTelegram:
             await self._send_error_message(f"❌ Ошибка при создании сценариев: {str(e)}")
     
     async def _continue_with_simple_image(self, query=None):
-        """НОВЫЙ РЕЖИМ: Создание шутки + промпта для Sora + анекдота."""
+        """НОВЫЙ РЕЖИМ: Создание шутки + промпта для Sora + анекдота от GPT/Claude/Gemini."""
         try:
             if query:
-                await query.edit_message_text("🎨 Создаю контент (шутка + картинка + анекдот)...")
+                await query.edit_message_text("🎨 Создаю контент от GPT, Claude и Gemini...")
             else:
-                await self._send_status_message("🎨 Создаю контент от всех авторов...")
+                await self._send_status_message("🎨 Создаю контент от 3 моделей...")
             
-            # Импортируем функцию для режима simple_image
-            from utils.llm_clients import invoke_llm_simple_image
+            # Импортируем функции для разных моделей
+            from utils.llm_clients import (
+                invoke_gpt_simple_image, 
+                invoke_gemini_simple_image, 
+                invoke_claude_simple_image
+            )
             
-            # Генерируем контент от каждого автора
+            # Генерируем контент от каждой модели
             results = []
-            for writer_type in ['A', 'B', 'C', 'D', 'E']:
-                try:
-                    await self._send_status_message(f"✍️ Автор {SCRIPTWRITERS[writer_type]['name']} работает...")
-                    
-                    result = invoke_llm_simple_image(self.manager.news, writer_type)
-                    result['writer_type'] = writer_type
-                    result['writer_name'] = SCRIPTWRITERS[writer_type]['name']
-                    results.append(result)
-                    
-                    telegram_logger.info(f"✅ Контент от {writer_type}: {result.get('title', 'OK')}")
-                except Exception as e:
-                    telegram_logger.error(f"❌ Ошибка автора {writer_type}: {e}")
+            
+            # GPT-4o
+            try:
+                await self._send_status_message("🤖 GPT-4o работает...")
+                result = invoke_gpt_simple_image(self.manager.news, 'A')  # Используем стиль автора A
+                result['model'] = 'GPT-4o'
+                result['model_icon'] = '🤖'
+                results.append(result)
+                telegram_logger.info(f"✅ Контент от GPT: {result.get('title', 'OK')}")
+            except Exception as e:
+                telegram_logger.error(f"❌ Ошибка GPT: {e}")
+                await self._send_status_message(f"⚠️ GPT ошибка: {str(e)[:50]}")
+            
+            # Claude
+            try:
+                await self._send_status_message("🟣 Claude работает...")
+                result = invoke_claude_simple_image(self.manager.news, 'B')  # Используем стиль автора B
+                result['model'] = 'Claude'
+                result['model_icon'] = '🟣'
+                results.append(result)
+                telegram_logger.info(f"✅ Контент от Claude: {result.get('title', 'OK')}")
+            except Exception as e:
+                telegram_logger.error(f"❌ Ошибка Claude: {e}")
+                await self._send_status_message(f"⚠️ Claude ошибка: {str(e)[:50]}")
+            
+            # Gemini
+            try:
+                await self._send_status_message("💎 Gemini работает...")
+                result = invoke_gemini_simple_image(self.manager.news, 'C')  # Используем стиль автора C
+                result['model'] = 'Gemini'
+                result['model_icon'] = '💎'
+                results.append(result)
+                telegram_logger.info(f"✅ Контент от Gemini: {result.get('title', 'OK')}")
+            except Exception as e:
+                telegram_logger.error(f"❌ Ошибка Gemini: {e}")
+                await self._send_status_message(f"⚠️ Gemini ошибка: {str(e)[:50]}")
             
             if not results:
-                await self._send_error_message("❌ Не удалось создать контент")
+                await self._send_error_message("❌ Не удалось создать контент ни от одной модели")
                 return
             
             # Сохраняем результаты
@@ -353,6 +381,7 @@ class ComicBotTelegram:
         try:
             info_text = f"🎨 *Создано {len(results)} вариантов контента*\n\n"
             info_text += f"📰 Новость: {self.manager.news.get('title', 'Без заголовка')}\n\n"
+            info_text += "Модели: GPT-4o 🤖 | Claude 🟣 | Gemini 💎\n\n"
             info_text += "Выберите лучший вариант:"
             
             await self.app.bot.send_message(
@@ -363,21 +392,33 @@ class ComicBotTelegram:
             
             # Отправляем каждый результат
             for i, result in enumerate(results):
-                text = f"📝 *Вариант #{i+1} от {result.get('writer_name', 'Автор')}*\n\n"
+                model_icon = result.get('model_icon', '🤖')
+                model_name = result.get('model', 'AI')
+                
+                text = f"{model_icon} *{model_name}*\n\n"
                 text += f"*{result.get('title', 'Без заголовка')}*\n\n"
                 
-                text += f"😂 *Шутка:*\n{result.get('joke', 'Нет шутки')}\n\n"
+                text += f"😂 *Шутка (RU):*\n{result.get('joke', 'Нет шутки')}\n\n"
                 
-                text += f"🖼️ *Промпт для Sora:*\n`{result.get('sora_prompt', 'No prompt')[:200]}...`\n\n"
+                # Показываем английскую версию шутки если есть
+                joke_en = result.get('joke_en', '')
+                if joke_en:
+                    text += f"🇬🇧 *Joke (EN):*\n{joke_en}\n\n"
+                
+                sora_prompt = result.get('sora_prompt', 'No prompt')
+                if len(sora_prompt) > 300:
+                    text += f"🖼️ *Промпт для Sora:*\n`{sora_prompt[:300]}...`\n\n"
+                else:
+                    text += f"🖼️ *Промпт для Sora:*\n`{sora_prompt}`\n\n"
                 
                 anecdote = result.get('anecdote', 'Нет анекдота')
-                if len(anecdote) > 300:
-                    text += f"🎭 *Анекдот:*\n{anecdote[:300]}...\n"
+                if len(anecdote) > 400:
+                    text += f"🎭 *Анекдот:*\n{anecdote[:400]}...\n"
                 else:
                     text += f"🎭 *Анекдот:*\n{anecdote}\n"
                 
                 keyboard = [
-                    [InlineKeyboardButton(f"✅ Выбрать этот вариант", callback_data=f"select_simple_{i}")],
+                    [InlineKeyboardButton(f"✅ Выбрать {model_name}", callback_data=f"select_simple_{i}")],
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -390,7 +431,7 @@ class ComicBotTelegram:
             
             # Кнопки управления
             general_keyboard = [
-                [InlineKeyboardButton("🔄 Пересоздать контент", callback_data="regenerate_simple")],
+                [InlineKeyboardButton("🔄 Пересоздать от всех моделей", callback_data="regenerate_simple")],
                 [InlineKeyboardButton("🔄 Новая новость", callback_data="regenerate_news")],
                 [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
             ]
