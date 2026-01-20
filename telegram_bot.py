@@ -556,11 +556,12 @@ class ComicBotTelegram:
                 # Отправляем промпт напрямую - он уже полностью на русском
                 telegram_logger.info(f"📤 Промпт для DALL-E: {sora_prompt[:100]}...")
                 
+                # Используем ту же модель что и старый функционал (gpt-image-1)
                 response = client.images.generate(
-                    model="dall-e-3",
+                    model=config.GPT_IMAGE_MODEL,
                     prompt=sora_prompt,
                     size="1024x1024",
-                    quality="standard",
+                    quality=config.GPT_IMAGE_QUALITY,
                     n=1
                 )
                 
