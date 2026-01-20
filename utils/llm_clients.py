@@ -107,7 +107,7 @@ def invoke_gpt(news: Dict[str, Any], writer_type: str) -> Dict[str, Any]:
     from openai import OpenAI
     
     client = OpenAI(api_key=config.OPENAI_API_KEY)
-    model = get_setting("gpt_model", config.GPT_DIRECT_MODEL)
+    model = get_setting("gpt_model", "gpt-4o")
     
     system_prompt = load_system_prompt(writer_type)
     user_message = format_news_message(news)
@@ -352,7 +352,7 @@ def invoke_gpt_simple_image(news: Dict[str, Any], writer_type: str) -> Dict[str,
     from openai import OpenAI
     
     client = OpenAI(api_key=config.OPENAI_API_KEY)
-    model = get_setting("gpt_model", config.GPT_DIRECT_MODEL)
+    model = get_setting("gpt_model", "gpt-4o")
     
     system_prompt = load_simple_image_prompt(writer_type)
     user_message = format_news_for_simple_image(news)
