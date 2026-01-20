@@ -1391,19 +1391,24 @@ class ComicBotTelegram:
                 "simple_image": "Шутка + картинка"
             }
             
+            # Проверяем текущий режим
+            current_mode = get_content_mode()
+            
+            if current_mode == mode:
+                # Режим уже выбран - показываем уведомление
+                await query.answer(f"ℹ️ Режим '{mode_names.get(mode, mode)}' уже выбран", show_alert=True)
+                telegram_logger.info(f"⚠️ Режим {mode} уже был выбран")
+                return
+            
             telegram_logger.info(f"🎨 Вызов set_content_mode({mode})...")
             set_content_mode(mode)
             telegram_logger.info(f"⚙️ Режим контента изменен на: {mode}")
             
-            await query.answer(f"✅ Режим: {mode_names.get(mode, mode)}")
+            # Показываем уведомление с результатом
+            await query.answer(f"✅ Режим изменен на: {mode_names.get(mode, mode)}", show_alert=True)
+            
             telegram_logger.info(f"🎨 Обновление UI настроек...")
-            try:
-                await self._show_content_settings(query)
-            except Exception as edit_error:
-                if "Message is not modified" in str(edit_error):
-                    telegram_logger.info("⚠️ Сообщение не изменилось (тот же режим)")
-                else:
-                    raise edit_error
+            await self._show_content_settings(query)
             telegram_logger.info(f"🎨 Готово!")
             
         except Exception as e:
@@ -1411,7 +1416,7 @@ class ComicBotTelegram:
             import traceback
             telegram_logger.error(f"Traceback: {traceback.format_exc()}")
             try:
-                await query.answer(f"❌ Ошибка: {str(e)}")
+                await query.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
             except:
                 pass
     
