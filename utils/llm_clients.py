@@ -166,7 +166,7 @@ def invoke_gemini(news: Dict[str, Any], writer_type: str) -> Dict[str, Any]:
         raise ValueError("GEMINI_API_KEY не установлен в .env")
     
     genai.configure(api_key=api_key)
-    model_name = get_setting("gemini_model", config.GEMINI_MODEL)
+    model_name = get_setting("gemini_model", os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
     
     system_prompt = load_system_prompt(writer_type)
     user_message = format_news_message(news)
@@ -223,7 +223,7 @@ def invoke_claude(news: Dict[str, Any], writer_type: str) -> Dict[str, Any]:
         raise ValueError("ANTHROPIC_API_KEY не установлен в .env")
     
     client = anthropic.Anthropic(api_key=api_key)
-    model = get_setting("claude_model", config.CLAUDE_MODEL)
+    model = get_setting("claude_model", os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022"))
     
     system_prompt = load_system_prompt(writer_type)
     user_message = format_news_message(news)
@@ -400,7 +400,7 @@ def invoke_gemini_simple_image(news: Dict[str, Any], writer_type: str) -> Dict[s
         raise ValueError("GEMINI_API_KEY не установлен в .env")
     
     genai.configure(api_key=api_key)
-    model_name = get_setting("gemini_model", config.GEMINI_MODEL)
+    model_name = get_setting("gemini_model", os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
     
     system_prompt = load_simple_image_prompt(writer_type)
     user_message = format_news_for_simple_image(news)
@@ -444,7 +444,7 @@ def invoke_claude_simple_image(news: Dict[str, Any], writer_type: str) -> Dict[s
         raise ValueError("ANTHROPIC_API_KEY не установлен в .env")
     
     client = anthropic.Anthropic(api_key=api_key)
-    model = get_setting("claude_model", config.CLAUDE_MODEL)
+    model = get_setting("claude_model", os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022"))
     
     system_prompt = load_simple_image_prompt(writer_type)
     user_message = format_news_for_simple_image(news)
