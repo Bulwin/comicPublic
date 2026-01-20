@@ -20,12 +20,12 @@
 Ответ ДОЛЖЕН быть в формате JSON:
 
 ```json
-{
+{{
   "title": "Заголовок/название работы",
   "joke": "Шутка - короткая юмористическая подпись к картинке",
   "sora_prompt": "Detailed description in English for image generation. Cartoon style, vibrant colors, humorous scene depicting...",
   "anecdote": "Короткий анекдот на тему новости.\nС переносами строк.\nДиалоги персонажей или ситуация."
-}
+}}
 ```
 
 ## Примеры хороших шуток (для понимания стиля):
