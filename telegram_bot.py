@@ -447,8 +447,7 @@ class ComicBotTelegram:
             
             await self.app.bot.send_message(
                 chat_id=self.admin_chat_id,
-                text="🎯 *Или выберите другое действие:*",
-                parse_mode='Markdown',
+                text="🎯 Или выберите другое действие:",
                 reply_markup=general_reply_markup
             )
             
@@ -1044,8 +1043,7 @@ class ComicBotTelegram:
         """Отправка статусного сообщения."""
         await self.app.bot.send_message(
             chat_id=self.admin_chat_id,
-            text=message,
-            parse_mode='Markdown'
+            text=message
         )
     
     async def _send_multiple_images_result(self, image_results: List[Dict[str, Any]]):
