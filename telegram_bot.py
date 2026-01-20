@@ -379,15 +379,24 @@ class ComicBotTelegram:
     async def _send_simple_image_results(self, results: List[Dict[str, Any]]):
         """Отправка результатов режима simple_image для выбора."""
         try:
-            info_text = f"🎨 *Создано {len(results)} вариантов контента*\n\n"
-            info_text += f"📰 Новость: {self.manager.news.get('title', 'Без заголовка')}\n\n"
+            # Функция экранирования спецсимволов Markdown
+            def escape_md(text):
+                if not text:
+                    return ""
+                text = str(text)
+                # Экранируем проблемные символы
+                for char in ['_', '*', '`', '[']:
+                    text = text.replace(char, ' ')
+                return text
+            
+            info_text = f"🎨 Создано {len(results)} вариантов контента\n\n"
+            info_text += f"📰 Новость: {escape_md(self.manager.news.get('title', 'Без заголовка'))}\n\n"
             info_text += "Модели: GPT-4o 🤖 | Claude 🟣 | Gemini 💎\n\n"
             info_text += "Выберите лучший вариант:"
             
             await self.app.bot.send_message(
                 chat_id=self.admin_chat_id,
-                text=info_text,
-                parse_mode='Markdown'
+                text=info_text
             )
             
             # Отправляем каждый результат
@@ -395,27 +404,27 @@ class ComicBotTelegram:
                 model_icon = result.get('model_icon', '🤖')
                 model_name = result.get('model', 'AI')
                 
-                text = f"{model_icon} *{model_name}*\n\n"
-                text += f"*{result.get('title', 'Без заголовка')}*\n\n"
+                text = f"{model_icon} {model_name}\n\n"
+                text += f"📌 {escape_md(result.get('title', 'Без заголовка'))}\n\n"
                 
-                text += f"😂 *Шутка (RU):*\n{result.get('joke', 'Нет шутки')}\n\n"
+                text += f"😂 Шутка (RU):\n{escape_md(result.get('joke', 'Нет шутки'))}\n\n"
                 
                 # Показываем английскую версию шутки если есть
                 joke_en = result.get('joke_en', '')
                 if joke_en:
-                    text += f"🇬🇧 *Joke (EN):*\n{joke_en}\n\n"
+                    text += f"🇬🇧 Joke (EN):\n{escape_md(joke_en)}\n\n"
                 
                 sora_prompt = result.get('sora_prompt', 'No prompt')
-                if len(sora_prompt) > 300:
-                    text += f"🖼️ *Промпт для Sora:*\n`{sora_prompt[:300]}...`\n\n"
+                if len(sora_prompt) > 400:
+                    text += f"🖼️ Промпт для Sora:\n{escape_md(sora_prompt[:400])}...\n\n"
                 else:
-                    text += f"🖼️ *Промпт для Sora:*\n`{sora_prompt}`\n\n"
+                    text += f"🖼️ Промпт для Sora:\n{escape_md(sora_prompt)}\n\n"
                 
                 anecdote = result.get('anecdote', 'Нет анекдота')
-                if len(anecdote) > 400:
-                    text += f"🎭 *Анекдот:*\n{anecdote[:400]}...\n"
+                if len(anecdote) > 500:
+                    text += f"🎭 Анекдот:\n{escape_md(anecdote[:500])}...\n"
                 else:
-                    text += f"🎭 *Анекдот:*\n{anecdote}\n"
+                    text += f"🎭 Анекдот:\n{escape_md(anecdote)}\n"
                 
                 keyboard = [
                     [InlineKeyboardButton(f"✅ Выбрать {model_name}", callback_data=f"select_simple_{i}")],
@@ -425,7 +434,6 @@ class ComicBotTelegram:
                 await self.app.bot.send_message(
                     chat_id=self.admin_chat_id,
                     text=text,
-                    parse_mode='Markdown',
                     reply_markup=reply_markup
                 )
             
