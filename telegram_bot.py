@@ -230,6 +230,10 @@ class ComicBotTelegram:
             await self._select_simple_result(query, index)
         elif action == "regenerate_simple":
             await self._regenerate_simple(query)
+        elif action == "generate_image_and_post":
+            await self._generate_image_and_post(query)
+        elif action == "copy_sora_prompt":
+            await self._copy_sora_prompt(query)
         else:
             telegram_logger.warning(f"⚠️ Неизвестное действие: {action}")
     
@@ -480,9 +484,9 @@ class ComicBotTelegram:
             text += f"✍️ Автор: {selected.get('writer_name', 'Неизвестен')}"
             
             keyboard = [
-                [InlineKeyboardButton("📋 Скопировать промпт Sora", callback_data="copy_sora_prompt")],
+                [InlineKeyboardButton("🖼️ Сгенерировать картинку и пост", callback_data="generate_image_and_post")],
+                [InlineKeyboardButton("📋 Скопировать промпт", callback_data="copy_sora_prompt")],
                 [InlineKeyboardButton("🔄 Выбрать другой вариант", callback_data="regenerate_simple")],
-                [InlineKeyboardButton("🔄 Новая новость", callback_data="regenerate_news")],
                 [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -504,6 +508,122 @@ class ComicBotTelegram:
             await self._continue_with_simple_image()
         except Exception as e:
             await self._send_error_message(f"❌ Ошибка при перегенерации: {str(e)}")
+    
+    async def _copy_sora_prompt(self, query):
+        """Отправка промпта для копирования."""
+        try:
+            if not hasattr(self.manager, 'selected_simple_result') or not self.manager.selected_simple_result:
+                await self._send_error_message("❌ Нет выбранного результата")
+                return
+            
+            selected = self.manager.selected_simple_result
+            sora_prompt = selected.get('sora_prompt', 'No prompt')
+            
+            # Отправляем промпт отдельным сообщением для удобного копирования
+            await self.app.bot.send_message(
+                chat_id=self.admin_chat_id,
+                text=f"📋 Промпт для Sora/DALL-E:\n\n{sora_prompt}"
+            )
+            
+            await query.answer("✅ Промпт отправлен отдельным сообщением")
+            
+        except Exception as e:
+            await self._send_error_message(f"❌ Ошибка: {str(e)}")
+    
+    async def _generate_image_and_post(self, query):
+        """Генерация картинки через DALL-E 3 и создание готового поста."""
+        try:
+            if not hasattr(self.manager, 'selected_simple_result') or not self.manager.selected_simple_result:
+                await self._send_error_message("❌ Нет выбранного результата")
+                return
+            
+            await query.edit_message_text("🖼️ Генерирую картинку через DALL-E 3...")
+            
+            selected = self.manager.selected_simple_result
+            sora_prompt = selected.get('sora_prompt', '')
+            
+            if not sora_prompt:
+                await self._send_error_message("❌ Промпт для изображения не найден")
+                return
+            
+            # Генерируем изображение через DALL-E 3
+            from openai import OpenAI
+            client = OpenAI(api_key=config.OPENAI_API_KEY)
+            
+            await self._send_status_message("🎨 DALL-E 3 создаёт изображение...")
+            
+            try:
+                response = client.images.generate(
+                    model="dall-e-3",
+                    prompt=sora_prompt,
+                    size="1024x1024",
+                    quality="standard",
+                    n=1
+                )
+                
+                image_url = response.data[0].url
+                
+                # Скачиваем изображение
+                import requests
+                from datetime import datetime
+                
+                image_response = requests.get(image_url)
+                if image_response.status_code != 200:
+                    await self._send_error_message("❌ Не удалось скачать изображение")
+                    return
+                
+                # Сохраняем изображение
+                image_dir = Path(__file__).resolve().parent / "data" / "images"
+                image_dir.mkdir(parents=True, exist_ok=True)
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                image_path = image_dir / f"simple_image_{timestamp}.png"
+                
+                with open(image_path, 'wb') as f:
+                    f.write(image_response.content)
+                
+                # Сохраняем путь к изображению
+                self.manager.simple_image_path = str(image_path)
+                
+                telegram_logger.info(f"✅ Изображение сохранено: {image_path}")
+                
+            except Exception as e:
+                telegram_logger.error(f"❌ Ошибка DALL-E 3: {e}")
+                await self._send_error_message(f"❌ Ошибка генерации изображения: {str(e)}")
+                return
+            
+            # Формируем готовый пост
+            news_title = self.manager.news.get('title', 'Новость дня')
+            joke = selected.get('joke', '')
+            anecdote = selected.get('anecdote', '')
+            model_name = selected.get('model', 'AI')
+            
+            # Формируем caption для поста
+            caption = f"📰 *{news_title}*\n\n"
+            caption += f"😂 {joke}\n\n"
+            caption += f"🎭 *Анекдот:*\n{anecdote}\n\n"
+            caption += f"🤖 Создано: {model_name}"
+            
+            keyboard = [
+                [InlineKeyboardButton("📤 Опубликовать в канал", callback_data="publish_simple_post")],
+                [InlineKeyboardButton("🔄 Перегенерировать картинку", callback_data="regenerate_simple_image")],
+                [InlineKeyboardButton("🔄 Выбрать другой вариант", callback_data="regenerate_simple")],
+                [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Отправляем готовый пост для одобрения
+            with open(image_path, 'rb') as photo:
+                await self.app.bot.send_photo(
+                    chat_id=self.admin_chat_id,
+                    photo=photo,
+                    caption=caption,
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+            
+        except Exception as e:
+            await self._send_error_message(f"❌ Ошибка при генерации поста: {str(e)}")
     
     async def _continue_with_image(self, query=None):
         """Продолжение с созданием изображений для топ-4 сценариев."""
