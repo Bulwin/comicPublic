@@ -5,16 +5,15 @@
 
 ## Что нужно создать:
 
-1. **Шутка** - короткая юмористическая фраза на РУССКОМ языке (1-2 предложения, макс 10-15 слов)
-2. **Промпт для картинки** - описание ВИЗУАЛЬНОЙ сцены БЕЗ ТЕКСТА (на английском!)
+1. **Шутка** - короткая юмористическая фраза на РУССКОМ (1-2 предложения, макс 10-15 слов)
+2. **Промпт для картинки** - описание сцены С РУССКИМ ТЕКСТОМ/ПОДПИСЬЮ/РЕЧЬЮ ПЕРСОНАЖЕЙ
 3. **Анекдот** - короткий анекдот на тему новости на РУССКОМ (3-7 строк)
 
 ## ВАЖНО для промпта картинки:
-- Описание на АНГЛИЙСКОМ языке
-- ❌ НЕ ВКЛЮЧАЙ текст в картинку! Никаких надписей, титров, caption!
-- Описывай ТОЛЬКО визуальную сцену: персонажей, позы, эмоции, окружение
-- Стиль: яркий, мультяшный, юмористический, карикатура
-- Сцена должна визуально иллюстрировать ситуацию из новости
+- Описание сцены на английском, но ТЕКСТ НА КАРТИНКЕ на РУССКОМ!
+- Включи юмористическую подпись внизу или речевой пузырь с репликой персонажа
+- Стиль: яркий, мультяшный, юмористический, карикатура/комикс
+- Сцена должна быть смешной вместе с текстом
 
 ## КРИТИЧЕСКИ ВАЖНО:
 Ответ ТОЛЬКО в формате JSON:
@@ -23,18 +22,15 @@
 {{
   "title": "Заголовок на русском",
   "joke": "Короткая шутка на РУССКОМ (10-15 слов)",
-  "sora_prompt": "Cartoon style illustration. [Visual scene description WITHOUT any text]. Vibrant colors, humorous style, exaggerated expressions. NO TEXT ON IMAGE.",
+  "sora_prompt": "Cartoon comic style illustration of [scene description in English]. Speech bubble with Russian text: 'ТЕКСТ НА РУССКОМ' or bold caption at bottom in Russian: 'ПОДПИСЬ НА РУССКОМ'. Vibrant colors, humorous comic style.",
   "anecdote": "Короткий анекдот на РУССКОМ.\nС переносами строк."
 }}
 ```
 
-## Примеры шуток:
-- "Когда сказали 'работаем до результата', но не уточнили чьего"
-- "Ожидание: миллион. Реальность: опыт"
-- "Типичный понедельник в России"
-
-## Пример промпта для картинки (БЕЗ текста):
-"Cartoon style humorous illustration of a confused office worker staring at a giant stack of papers, papers flying everywhere, exaggerated shocked expression, bright colorful office environment, humorous style. NO TEXT ON IMAGE."
+## Примеры промптов С РУССКИМ ТЕКСТОМ:
+- "Cartoon comic style of a cat sitting at CEO desk looking smug. Speech bubble with Russian text: 'Я здесь главный!'. Other animals looking confused in background. Vibrant office setting."
+- "Humorous cartoon illustration of a man hiding behind pillow from a bat flying in his room. Bold caption at bottom in Russian Cyrillic: 'Тишину заказывали?'. Exaggerated scared expression, nighttime scene."
+- "Comic style raccoon eating eggs at breakfast table. Speech bubble in Russian: 'Американская мечта? Нет, белорусская реальность!'. Cozy kitchen setting."
 
 ## Пример анекдота:
 ```
