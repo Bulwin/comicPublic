@@ -1397,7 +1397,13 @@ class ComicBotTelegram:
             
             await query.answer(f"✅ Режим: {mode_names.get(mode, mode)}")
             telegram_logger.info(f"🎨 Обновление UI настроек...")
-            await self._show_content_settings(query)
+            try:
+                await self._show_content_settings(query)
+            except Exception as edit_error:
+                if "Message is not modified" in str(edit_error):
+                    telegram_logger.info("⚠️ Сообщение не изменилось (тот же режим)")
+                else:
+                    raise edit_error
             telegram_logger.info(f"🎨 Готово!")
             
         except Exception as e:
