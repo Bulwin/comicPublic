@@ -1852,10 +1852,107 @@ class ComicBotTelegram:
         """Настройка обработчиков команд."""
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("status", self.status_command))
+        self.app.add_handler(CommandHandler("settings", self.settings_command))
+        self.app.add_handler(CommandHandler("joke", self.joke_command))
+        self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
         
         # Добавляем обработчик ошибок
         self.app.add_error_handler(self.error_handler)
+    
+    async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /settings - настройки генерации."""
+        if not self._is_admin(update):
+            await update.message.reply_text("❌ У вас нет прав для использования этого бота.")
+            return
+        
+        try:
+            settings_text = get_all_settings_formatted()
+            settings_text += "\n📋 *Выберите настройку для изменения:*"
+        except:
+            settings_text = "⚙️ *Настройки генерации*\n\n📋 *Выберите настройку:*"
+        
+        keyboard = [
+            [InlineKeyboardButton("🎨 Режим контента", callback_data="settings_content")],
+            [InlineKeyboardButton("🤖 Режим генерации", callback_data="settings_mode")],
+            [InlineKeyboardButton("👨‍⚖️ Система жюри", callback_data="settings_jury")],
+            [InlineKeyboardButton("📝 Сценариев от автора", callback_data="settings_scripts")],
+            [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            settings_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def joke_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /joke - создать анекдот."""
+        if not self._is_admin(update):
+            await update.message.reply_text("❌ У вас нет прав для использования этого бота.")
+            return
+        
+        keyboard = [
+            [InlineKeyboardButton("🎭 Создать анекдот", callback_data="create_joke")],
+            [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "🎭 *Создание анекдота*\n\n"
+            "Бот создаст анекдоты на основе свежей новости дня.\n"
+            "Вы сможете выбрать лучший и опубликовать в канал.\n\n"
+            "Нажмите кнопку для начала:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /help - помощь."""
+        if not self._is_admin(update):
+            await update.message.reply_text("❌ У вас нет прав для использования этого бота.")
+            return
+        
+        help_text = """🎭 *DailyComicBot - Помощь*
+
+📋 *Доступные команды:*
+
+/start - Главное меню бота
+/status - Текущий статус системы
+/settings - Настройки генерации
+/joke - Создать анекдот
+/help - Это сообщение
+
+🎨 *Режимы контента:*
+
+• *Шутка + картинка* - генерация шутки, картинки и анекдота через GPT/Claude/Gemini
+• *4-панельный комикс* - старый режим со сценариями
+
+🤖 *Как работает:*
+
+1. Бот получает свежую новость через Perplexity
+2. 3 модели (GPT, Claude, Gemini) создают контент
+3. Вы выбираете лучший вариант
+4. DALL-E 3 генерирует картинку
+5. Готовый пост публикуется в канал
+
+⏰ *Автоматический режим:*
+Каждый день бот сам предлагает контент в заданное время.
+
+❓ *Вопросы?* Обратитесь к разработчику."""
+        
+        keyboard = [
+            [InlineKeyboardButton("🚀 Начать", callback_data="manual_start")],
+            [InlineKeyboardButton("⚙️ Настройки", callback_data="bot_settings")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            help_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
     
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик ошибок Telegram бота."""
@@ -1885,9 +1982,30 @@ class ComicBotTelegram:
         # Настройка обработчиков
         self.setup_handlers()
         
+        # Устанавливаем меню команд
+        await self._setup_bot_commands()
+        
         # Запуск бота
         telegram_logger.info("Запуск Telegram бота...")
         await self.app.run_polling()
+    
+    async def _setup_bot_commands(self):
+        """Установка меню команд бота."""
+        from telegram import BotCommand
+        
+        commands = [
+            BotCommand("start", "🚀 Начать / Главное меню"),
+            BotCommand("status", "📊 Статус системы"),
+            BotCommand("settings", "⚙️ Настройки генерации"),
+            BotCommand("joke", "🎭 Создать анекдот"),
+            BotCommand("help", "❓ Помощь")
+        ]
+        
+        try:
+            await self.app.bot.set_my_commands(commands)
+            telegram_logger.info("✅ Меню команд бота установлено")
+        except Exception as e:
+            telegram_logger.error(f"❌ Ошибка установки меню команд: {e}")
 
 
 def main():
