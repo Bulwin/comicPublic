@@ -11,9 +11,14 @@ import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+import os
+from dotenv import load_dotenv
 from utils import logger
 from utils.runtime_settings import get_setting, get_content_mode
 import config
+
+# Загружаем переменные окружения
+load_dotenv()
 
 # Пути к промптам
 PROMPT_FILE = Path(__file__).resolve().parent.parent / "prompts" / "scriptwriter_system_prompt.txt"
@@ -156,7 +161,7 @@ def invoke_gemini(news: Dict[str, Any], writer_type: str) -> Dict[str, Any]:
     except ImportError:
         raise ImportError("Установите google-generativeai: pip install google-generativeai")
     
-    api_key = config.GEMINI_API_KEY
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY не установлен в .env")
     
@@ -213,7 +218,7 @@ def invoke_claude(news: Dict[str, Any], writer_type: str) -> Dict[str, Any]:
     except ImportError:
         raise ImportError("Установите anthropic: pip install anthropic")
     
-    api_key = config.ANTHROPIC_API_KEY
+    api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY не установлен в .env")
     
@@ -390,7 +395,7 @@ def invoke_gemini_simple_image(news: Dict[str, Any], writer_type: str) -> Dict[s
     except ImportError:
         raise ImportError("Установите google-generativeai: pip install google-generativeai")
     
-    api_key = config.GEMINI_API_KEY
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY не установлен в .env")
     
@@ -434,7 +439,7 @@ def invoke_claude_simple_image(news: Dict[str, Any], writer_type: str) -> Dict[s
     except ImportError:
         raise ImportError("Установите anthropic: pip install anthropic")
     
-    api_key = config.ANTHROPIC_API_KEY
+    api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY не установлен в .env")
     
