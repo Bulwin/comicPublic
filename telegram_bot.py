@@ -565,15 +565,27 @@ class ComicBotTelegram:
                     n=1
                 )
                 
-                image_url = response.data[0].url
-                
-                # Скачиваем изображение
+                # Обрабатываем ответ как в старом функционале (может быть b64_json или url)
                 import requests
+                import base64
                 from datetime import datetime
                 
-                image_response = requests.get(image_url)
-                if image_response.status_code != 200:
-                    await self._send_error_message("❌ Не удалось скачать изображение")
+                image_data = response.data[0]
+                
+                if hasattr(image_data, 'b64_json') and image_data.b64_json:
+                    # Если base64 данные
+                    telegram_logger.info("✅ Получены данные изображения в формате base64")
+                    image_bytes = base64.b64decode(image_data.b64_json)
+                elif hasattr(image_data, 'url') and image_data.url:
+                    # Если URL
+                    telegram_logger.info(f"✅ Получен URL изображения")
+                    image_response = requests.get(image_data.url, timeout=30)
+                    if image_response.status_code != 200:
+                        await self._send_error_message("❌ Не удалось скачать изображение")
+                        return
+                    image_bytes = image_response.content
+                else:
+                    await self._send_error_message("❌ В ответе API отсутствуют данные изображения")
                     return
                 
                 # Сохраняем изображение
@@ -584,7 +596,7 @@ class ComicBotTelegram:
                 image_path = image_dir / f"simple_image_{timestamp}.png"
                 
                 with open(image_path, 'wb') as f:
-                    f.write(image_response.content)
+                    f.write(image_bytes)
                 
                 # Сохраняем путь к изображению
                 self.manager.simple_image_path = str(image_path)
