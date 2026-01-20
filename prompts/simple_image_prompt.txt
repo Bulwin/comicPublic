@@ -5,37 +5,36 @@
 
 ## Что нужно создать:
 
-1. **Шутка-подпись** - короткая юмористическая фраза для картинки (1-2 предложения, макс 10-15 слов)
-2. **Промпт для Sora** - описание картинки С ТЕКСТОМ ШУТКИ (на английском!)
-3. **Анекдот** - короткий анекдот на тему новости (3-7 строк)
+1. **Шутка** - короткая юмористическая фраза на РУССКОМ языке (1-2 предложения, макс 10-15 слов)
+2. **Промпт для картинки** - описание ВИЗУАЛЬНОЙ сцены БЕЗ ТЕКСТА (на английском!)
+3. **Анекдот** - короткий анекдот на тему новости на РУССКОМ (3-7 строк)
 
-## ВАЖНО для промпта Sora:
+## ВАЖНО для промпта картинки:
 - Описание на АНГЛИЙСКОМ языке
-- ОБЯЗАТЕЛЬНО включи текст шутки в картинку как caption/подпись/надпись
+- ❌ НЕ ВКЛЮЧАЙ текст в картинку! Никаких надписей, титров, caption!
+- Описывай ТОЛЬКО визуальную сцену: персонажей, позы, эмоции, окружение
 - Стиль: яркий, мультяшный, юмористический, карикатура
-- Сцена должна иллюстрировать шутку визуально
-- Укажи где и как разместить текст (например: "text at top/bottom saying...")
+- Сцена должна визуально иллюстрировать ситуацию из новости
 
 ## КРИТИЧЕСКИ ВАЖНО:
 Ответ ТОЛЬКО в формате JSON:
 
 ```json
 {{
-  "title": "Заголовок работы",
-  "joke": "Короткая шутка на русском (10-15 слов макс)",
-  "joke_en": "Same joke translated to English for image",
-  "sora_prompt": "Cartoon style illustration. [Scene description]. Text caption at bottom saying: '[joke_en text]'. Vibrant colors, humorous style.",
-  "anecdote": "Короткий анекдот на русском.\nС переносами строк."
+  "title": "Заголовок на русском",
+  "joke": "Короткая шутка на РУССКОМ (10-15 слов)",
+  "sora_prompt": "Cartoon style illustration. [Visual scene description WITHOUT any text]. Vibrant colors, humorous style, exaggerated expressions. NO TEXT ON IMAGE.",
+  "anecdote": "Короткий анекдот на РУССКОМ.\nС переносами строк."
 }}
 ```
 
 ## Примеры шуток:
-- "Когда сказали 'работаем до результата'"
-- "Ожидание vs реальность"
-- "Типичный понедельник"
+- "Когда сказали 'работаем до результата', но не уточнили чьего"
+- "Ожидание: миллион. Реальность: опыт"
+- "Типичный понедельник в России"
 
-## Пример промпта для Sora С ТЕКСТОМ:
-"Cartoon style humorous illustration of a confused cat staring at a laptop screen with spreadsheets. Bold text caption at bottom: 'When they said work from home would be easy'. Bright colors, exaggerated expressions, office humor style."
+## Пример промпта для картинки (БЕЗ текста):
+"Cartoon style humorous illustration of a confused office worker staring at a giant stack of papers, papers flying everywhere, exaggerated shocked expression, bright colorful office environment, humorous style. NO TEXT ON IMAGE."
 
 ## Пример анекдота:
 ```
